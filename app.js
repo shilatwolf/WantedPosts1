@@ -230,14 +230,9 @@
     if (pool.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'empty-state';
-      var hasData = typeof IMAGES_DATA !== 'undefined';
-      var dataLen = hasData ? (IMAGES_DATA[poolKey] || []).length : '?';
       empty.innerHTML =
         '<strong>No visuals added yet for this brand.</strong>' +
-        '<small style="display:block;margin-top:8px;color:#666;font-size:10px">' +
-        'debug: IMAGES_DATA=' + (hasData ? 'defined' : 'MISSING') +
-        ' pool=' + poolKey + ' count=' + dataLen +
-        '</small>';
+        'Drop images into <code>assets/images/' + poolKey + '/</code> and run <code>node generate-manifest.js</code>.';
       elImageGrid.appendChild(empty);
       return;
     }
@@ -545,12 +540,14 @@
     // Init canvases
     CANVAS.init($('canvas-11'), $('canvas-916'));
 
-    // Load images from the pre-generated JS manifest (works on file:// and Netlify)
-    if (typeof IMAGES_DATA !== 'undefined') {
-      state.images = IMAGES_DATA;
-    } else {
-      console.warn('[images-data.js] not loaded — run: node generate-manifest.js');
-      state.images = { overwolf: [], tebex: [], outplayed: [] };
+    // Read image manifest from the embedded JSON block in index.html
+    // (works on file://, Netlify, and any sandboxed preview — no fetch, no global vars)
+    try {
+      var el = document.getElementById('images-data-block');
+      state.images = el ? JSON.parse(el.textContent) : {};
+    } catch (e) {
+      console.warn('[images-data-block] parse error:', e);
+      state.images = {};
     }
 
     // Build static grids

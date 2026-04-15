@@ -54,13 +54,13 @@ BRANDS.forEach(function (brand) {
 // Inject into index.html between the marker comments
 var html    = fs.readFileSync(HTML_FILE, 'utf8');
 var newBlock =
-  '<script id="images-data-block">\n' +
-  'var IMAGES_DATA = ' + JSON.stringify(manifest) + ';\n' +
+  '<script type="application/json" id="images-data-block">\n' +
+  JSON.stringify(manifest) + '\n' +
   '</script>';
 
 var updated = html.replace(
-  /<!-- IMAGES_DATA:.*?-->\s*<script id="images-data-block">[\s\S]*?<\/script>\s*<!-- END IMAGES_DATA -->/,
-  '<!-- IMAGES_DATA: auto-injected by generate-manifest.js — do not edit this block by hand -->\n' +
+  /<!-- IMAGES_DATA:.*?-->\s*<script[^>]*id="images-data-block"[^>]*>[\s\S]*?<\/script>\s*<!-- END IMAGES_DATA -->/,
+  '<!-- IMAGES_DATA: auto-injected by generate-manifest.js - do not edit this block by hand -->\n' +
   newBlock + '\n' +
   '<!-- END IMAGES_DATA -->'
 );
