@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node generate-manifest.js)"
+      "Bash(node generate-manifest.js)",
+      "WebFetch(domain:wantedposts.netlify.app)",
+      "Bash(mv Assets assets_new)",
+      "Bash(mv assets_new assets)"
     ]
   }
 }

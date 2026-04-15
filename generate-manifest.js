@@ -13,8 +13,16 @@ const path = require('path');
 
 const BRANDS      = ['overwolf', 'tebex', 'outplayed'];
 const IMAGE_EXTS  = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
-const IMAGES_DIR  = path.join(__dirname, 'assets', 'images');
 const HTML_FILE   = path.join(__dirname, 'index.html');
+
+// Support both 'assets' (lowercase, git/Netlify standard) and 'Assets' (Windows default)
+var IMAGES_DIR  = path.join(__dirname, 'assets', 'images');
+var ASSETS_PREFIX = 'assets';
+if (!fs.existsSync(IMAGES_DIR)) {
+  var alt = path.join(__dirname, 'Assets', 'images');
+  if (fs.existsSync(alt)) { IMAGES_DIR = alt; ASSETS_PREFIX = 'Assets'; }
+}
+console.log('[manifest] using folder: ' + IMAGES_DIR);
 
 function toLabel(filename) {
   return path.basename(filename, path.extname(filename))
@@ -42,7 +50,7 @@ BRANDS.forEach(function (brand) {
   files.forEach(function (file, i) {
     manifest[brand].push({
       id:      toId(brand, i),
-      file:    'assets/images/' + brand + '/' + file,
+      file:    ASSETS_PREFIX + '/images/' + brand + '/' + file,
       label:   toLabel(file),
       layouts: ['left', 'right', 'center']
     });
