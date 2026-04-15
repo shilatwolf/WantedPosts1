@@ -536,17 +536,13 @@
     // Init canvases
     CANVAS.init($('canvas-11'), $('canvas-916'));
 
-    // Load images manifest
-    fetch('./images.json')
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        state.images = data;
-        buildImageGrid(); // initial (no brand selected yet = empty)
-      })
-      .catch(function (e) {
-        console.warn('[images.json]', e);
-        state.images = { overwolf: [], tebex: [], outplayed: [] };
-      });
+    // Load images from the pre-generated JS manifest (works on file:// and Netlify)
+    if (typeof IMAGES_DATA !== 'undefined') {
+      state.images = IMAGES_DATA;
+    } else {
+      console.warn('[images-data.js] not loaded — run: node generate-manifest.js');
+      state.images = { overwolf: [], tebex: [], outplayed: [] };
+    }
 
     // Build static grids
     buildBrandGrid();
