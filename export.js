@@ -74,7 +74,7 @@ const EXPORT = (function () {
         quality:      8,
         width:        CANVAS.S11.w,
         height:       CANVAS.S11.h,
-        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js'
+        workerScript: 'gif.worker.js'
       });
 
       var oc  = document.createElement('canvas');
