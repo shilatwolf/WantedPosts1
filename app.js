@@ -220,15 +220,24 @@
     elImageGrid.innerHTML = '';
     if (!state.brand) return;
 
-    var pool = state.images[BRANDS[state.brand].imagePool] || [];
+    var poolKey = BRANDS[state.brand].imagePool;
+    // Try state.images first, fall back to global IMAGES_DATA directly
+    var src  = (state.images && state.images[poolKey] && state.images[poolKey].length)
+               ? state.images
+               : (typeof IMAGES_DATA !== 'undefined' ? IMAGES_DATA : {});
+    var pool = src[poolKey] || [];
 
     if (pool.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'empty-state';
+      var hasData = typeof IMAGES_DATA !== 'undefined';
+      var dataLen = hasData ? (IMAGES_DATA[poolKey] || []).length : '?';
       empty.innerHTML =
         '<strong>No visuals added yet for this brand.</strong>' +
-        'Drop images into <code>assets/images/' + BRANDS[state.brand].imagePool +
-        '/</code> and add entries to <code>images.json</code>.';
+        '<small style="display:block;margin-top:8px;color:#666;font-size:10px">' +
+        'debug: IMAGES_DATA=' + (hasData ? 'defined' : 'MISSING') +
+        ' pool=' + poolKey + ' count=' + dataLen +
+        '</small>';
       elImageGrid.appendChild(empty);
       return;
     }
