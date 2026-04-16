@@ -13,10 +13,11 @@ const EXPORT = (function () {
   // F 0-9  : headline fades in fast
   // All:    embers drift up, CTA pulses continuously
   function gifFrameState(f) {
-    // Faster headline fade-in (done in 10 frames)
-    var msgOpacity = f < 10 ? f / 9 : 1;
-    // Continuous CTA sine pulse — peaks roughly every 15 frames
-    // Value ranges 0→1→0, giving a smooth "breathe" effect
+    // msgOpacity is always 1 — a fade-in would cause a hard jump when the GIF
+    // loops back to frame 0 (text would instantly vanish), breaking the loop.
+    var msgOpacity = 1;
+    // CTA pulse: period = 15 frames, 45 frames total = exactly 3 full cycles.
+    // Frame 0 and frame 45 have the same phase (0), so the loop is seamless.
     var ctaPulse = (Math.sin(f * (Math.PI * 2 / 15)) * 0.5 + 0.5);
     return { msgOpacity: msgOpacity, ctaPulse: ctaPulse };
   }
@@ -70,7 +71,7 @@ const EXPORT = (function () {
         quality:      3,          // 1=best, lower = sharper colors (was 8)
         width:        CANVAS.S11.w,
         height:       CANVAS.S11.h,
-        workerScript: 'gif.worker.js'
+        workerScript: (typeof GIF_WORKER_URL !== 'undefined') ? GIF_WORKER_URL : 'gif.worker.js'
       });
 
       var oc  = document.createElement('canvas');
@@ -100,13 +101,23 @@ const EXPORT = (function () {
       var DURATION = 10;
       var S        = CANVAS.S916;
 
-      var mime = 'video/webm;codecs=vp9';
-      var ext  = 'webm';
-      if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) {
-        mime = 'video/webm';
-        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) {
-          mime = '';
-          ext  = 'webm';
+      // Prefer MP4 (required for Instagram Stories).
+      // Chrome 130+ supports video/mp4 natively in MediaRecorder.
+      // Falls back to WebM if MP4 is unavailable.
+      var mime = '', ext = 'mp4';
+      var candidates = [
+        'video/mp4;codecs=avc1',
+        'video/mp4',
+        'video/webm;codecs=vp9',
+        'video/webm'
+      ];
+      if (window.MediaRecorder) {
+        for (var ci = 0; ci < candidates.length; ci++) {
+          if (MediaRecorder.isTypeSupported(candidates[ci])) {
+            mime = candidates[ci];
+            ext  = candidates[ci].startsWith('video/mp4') ? 'mp4' : 'webm';
+            break;
+          }
         }
       }
 
@@ -173,6 +184,18 @@ const EXPORT = (function () {
     });
   }
 
+  /* ── Classic anchor-download helper ─────────────────── */
+  function _fallbackDownload(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   /* ── ZIP via JSZip ───────────────────────────────────── */
   function makeZip(png11, gif11, png916, videoResult) {
     return new Promise(function (resolve, reject) {
@@ -190,7 +213,7 @@ const EXPORT = (function () {
   }
 
   /* ── Main export orchestrator ────────────────────────── */
-  function generatePackage(state, onProgress, onComplete, onError) {
+  function generatePackage(state, onProgress, onComplete, onError, filename) {
     var step = function (pct, label) {
       if (onProgress) onProgress(pct, label);
     };
@@ -226,14 +249,46 @@ const EXPORT = (function () {
       })
       .then(function (zipBlob) {
         step(100, 'Done!');
-        var url = URL.createObjectURL(zipBlob);
-        var a   = document.createElement('a');
-        a.href     = url;
-        a.download = 'recruitment-banners.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        var zipName = (filename && filename.trim()) ? filename.trim() + '.zip' : 'recruitment-banners.zip';
+
+        // Prefer File System Access API — files saved this way are NOT tagged with
+        // Zone.Identifier (no MOTW), so Windows SmartScreen never blocks them.
+        if (window.showSaveFilePicker) {
+          window.showSaveFilePicker({
+            suggestedName: zipName,
+            types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
+          }).then(function (handle) {
+            return handle.createWritable().then(function (writable) {
+              return writable.write(zipBlob).then(function () {
+                return writable.close();
+              });
+            });
+          }).then(function () {
+            if (onComplete) onComplete({
+              videoExt:   videoResult.ext,
+              png11Size:  (png11.size  / 1024).toFixed(0),
+              gif11Size:  (gif11.size  / 1024).toFixed(0),
+              png916Size: (png916.size / 1024).toFixed(0),
+              vidSize:    (videoResult.blob.size / 1024).toFixed(0)
+            });
+          }).catch(function (err) {
+            // User cancelled the picker — not an error worth surfacing
+            if (err && err.name === 'AbortError') return;
+            console.warn('[EXPORT] showSaveFilePicker failed, falling back', err);
+            _fallbackDownload(zipBlob, zipName);
+            if (onComplete) onComplete({
+              videoExt:   videoResult.ext,
+              png11Size:  (png11.size  / 1024).toFixed(0),
+              gif11Size:  (gif11.size  / 1024).toFixed(0),
+              png916Size: (png916.size / 1024).toFixed(0),
+              vidSize:    (videoResult.blob.size / 1024).toFixed(0)
+            });
+          });
+          return; // onComplete called inside the promise chain above
+        }
+
+        // Fallback: classic <a> download (may trigger SmartScreen on Windows)
+        _fallbackDownload(zipBlob, zipName);
 
         if (onComplete) onComplete({
           videoExt:   videoResult.ext,

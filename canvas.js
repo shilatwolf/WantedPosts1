@@ -39,15 +39,32 @@ const CANVAS = (function () {
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
-    return new Promise(function (res, rej) {
-      var img = new Image();
-      // crossOrigin MUST be set before .src — required so canvas.toBlob()
-      // doesn't throw "tainted canvas". Netlify serves all assets with
-      // Access-Control-Allow-Origin: * so this always succeeds.
-      img.crossOrigin = 'anonymous';
-      img.onload  = function () { _imgCache[src] = img; res(img); };
-      img.onerror = function () { res(null); }; // skip missing images gracefully
-      img.src = src;
+    return new Promise(function (res) {
+      // Strategy: fetch the image as a Blob, then create a local object URL.
+      // A canvas drawn with blob: URLs is never "tainted" — toBlob() always works.
+      // Falls back to img + crossOrigin for file:// (local preview).
+      // encodeURI handles spaces and special chars in filenames (e.g. "Castle 1_1.png").
+      fetch(encodeURI(src))
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) {
+          var blobUrl = URL.createObjectURL(blob);
+          var img = new Image();
+          img.onload = function () {
+            _imgCache[src] = img;
+            URL.revokeObjectURL(blobUrl);
+            res(img);
+          };
+          img.onerror = function () { URL.revokeObjectURL(blobUrl); res(null); };
+          img.src = blobUrl;
+        })
+        .catch(function () {
+          // fetch failed (file:// local preview) — fall back to crossOrigin img
+          var img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload  = function () { _imgCache[src] = img; res(img); };
+          img.onerror = function () { res(null); };
+          img.src = src;
+        });
     });
   }
 
@@ -356,7 +373,8 @@ const CANVAS = (function () {
   /* ── Core renderer (single canvas + ctx) ──────────────── */
   async function renderToCtx(ctx, spec, state, frame, fstate, is916) {
     var w = spec.w, h = spec.h;
-    ctx.clearRect(0, 0, w, h);
+    // NOTE: no clearRect here — drawBg fills the entire canvas with fillRect,
+    // so clearRect is redundant and causes a blank-frame flash in video capture.
 
     var brand = BRANDS[state.brand];
     var lay   = state.layout || 'left';
