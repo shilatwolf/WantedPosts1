@@ -302,54 +302,56 @@ const CANVAS = (function () {
     });
     ctx.restore();
 
-    // ── CTA button ────────────────────────────────────────
-    var ctaFontSz = is916 ? 42 : 32;
-    ctx.save();
-    ctx.font = '700 ' + ctaFontSz + 'px ' + LF;
-    var txtW  = ctx.measureText(cta).width;
-    var padH  = is916 ? 36 : 32;
-    var padV  = is916 ? 22 : 18;
-    var btnW  = Math.min(cz.w, txtW + padH * 2);
-    var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
+    // ── CTA button — only rendered when cta text is present ──
+    if (cta && cta.trim()) {
+      var ctaFontSz = is916 ? 42 : 32;
+      ctx.save();
+      ctx.font = '700 ' + ctaFontSz + 'px ' + LF;
+      var txtW  = ctx.measureText(cta).width;
+      var padH  = is916 ? 36 : 32;
+      var padV  = is916 ? 22 : 18;
+      var btnW  = Math.min(cz.w, txtW + padH * 2);
+      var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
-    var bx = cz.al === 'left'   ? cz.x :
-             cz.al === 'right'  ? cz.x + cz.w - btnW :
-                                   cz.x + (cz.w - btnW) / 2;
-    var by = cz.y + (cz.h - btnH) / 2;
+      var bx = cz.al === 'left'   ? cz.x :
+               cz.al === 'right'  ? cz.x + cz.w - btnW :
+                                     cz.x + (cz.w - btnW) / 2;
+      var by = cz.y + (cz.h - btnH) / 2;
 
-    // Pulse: smooth scale + accent glow
-    var scale = 1 + ctaPulse * 0.07;
-    ctx.translate(bx + btnW / 2, by + btnH / 2);
-    ctx.scale(scale, scale);
+      // Pulse: smooth scale + accent glow
+      var scale = 1 + ctaPulse * 0.07;
+      ctx.translate(bx + btnW / 2, by + btnH / 2);
+      ctx.scale(scale, scale);
 
-    // Glow layer (prominent when ctaPulse > 0.2)
-    if (ctaPulse > 0.15) {
-      var glowSize = ctaPulse * 28;
-      var rgb      = hexToRGB(brand.accent);
-      var glowAlpha = ctaPulse * 0.55;
-      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, btnW * 0.8);
-      g.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + glowAlpha.toFixed(3) + ')');
-      g.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
-      ctx.beginPath();
-      ctx.rect(-btnW / 2 - glowSize, -btnH / 2 - glowSize,
-               btnW + glowSize * 2, btnH + glowSize * 2);
-      ctx.fillStyle = g;
-      ctx.fill();
+      // Glow layer (prominent when ctaPulse > 0.2)
+      if (ctaPulse > 0.15) {
+        var glowSize = ctaPulse * 28;
+        var rgb      = hexToRGB(brand.accent);
+        var glowAlpha = ctaPulse * 0.55;
+        var g = ctx.createRadialGradient(0, 0, 0, 0, 0, btnW * 0.8);
+        g.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + glowAlpha.toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
+        ctx.beginPath();
+        ctx.rect(-btnW / 2 - glowSize, -btnH / 2 - glowSize,
+                 btnW + glowSize * 2, btnH + glowSize * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+
+      // Button fill
+      ctx.fillStyle = brand.accent;
+      ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
+
+      // Button text
+      ctx.fillStyle    = brand.ctaTextColor;
+      ctx.font         = '700 ' + ctaFontSz + 'px ' + LF;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor  = 'rgba(0,0,0,0)';
+      ctx.shadowBlur   = 0;
+      ctx.fillText(cta, 0, 0);
+      ctx.restore();
     }
-
-    // Button fill
-    ctx.fillStyle = brand.accent;
-    ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
-
-    // Button text
-    ctx.fillStyle    = brand.ctaTextColor;
-    ctx.font         = '700 ' + ctaFontSz + 'px ' + LF;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor  = 'rgba(0,0,0,0)';
-    ctx.shadowBlur   = 0;
-    ctx.fillText(cta, 0, 0);
-    ctx.restore();
   }
 
   /* helper used inside drawText */
@@ -407,7 +409,9 @@ const CANVAS = (function () {
 
     drawBg(ctx, bgImg, w, h);
     drawSmoke(ctx, w, h, seeds, frame || 0, brand.emberColor || null);
-    if (msg && cta) drawText(ctx, zones, brand, msg, cta, is916, fstate || {});
+    // Render text as soon as we have a message — the CTA button is omitted until
+    // cta is also chosen, so the preview builds up progressively step by step.
+    if (msg) drawText(ctx, zones, brand, msg, cta || '', is916, fstate || {});
     drawLogo(ctx, logoImg, zones.logo);
   }
 

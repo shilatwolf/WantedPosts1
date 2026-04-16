@@ -260,7 +260,7 @@
     syncImageGrid();
     buildLayoutPills(img.layouts || []);
     renderWizard();
-    advance();
+    // No advance() — let the user browse images freely before moving on.
     scheduleRender();
   }
 
@@ -310,7 +310,7 @@
       el.classList.toggle('selected', el.dataset.layout === key);
     });
     renderWizard();
-    advance();
+    // No advance() — let the user stay on this step.
     scheduleRender();
   }
 
@@ -343,7 +343,7 @@
       el.classList.toggle('selected', el.dataset.value === text);
     });
     renderWizard();
-    advance();
+    // No advance() — consistent with position-text input; user moves on at their own pace.
     scheduleRender();
   }
 
