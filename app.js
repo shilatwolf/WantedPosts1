@@ -9,14 +9,14 @@
   /* ── State ──────────────────────────────────────────────── */
   var state = {
     brand:           null,   // 'overwolf' | 'tebex' | 'outplayed'
-    image:           null,   // image object from images.json
-    layout:          null,   // 'left' | 'right' | 'center'
-    messageMode:     'preset',
+    image:           null,   // image object from manifest
+    layout:          null,   // 'left' | 'center'
+    messageMode:     'position',  // default to position (specific is preferred)
     messagePreset:   null,
     messagePosition: '',
     cta:             null,
     // internal
-    images:          {}      // loaded from images.json
+    images:          {}
   };
 
   /* ── DOM refs ───────────────────────────────────────────── */
@@ -47,7 +47,6 @@
     var b = brand ? BRANDS[brand] : { accent: '#D34037', accentHover: '#F05C48' };
     document.documentElement.style.setProperty('--accent',       b.accent);
     document.documentElement.style.setProperty('--accent-hover', b.accentHover);
-    // Update ow-f for focus ring
     var hex = b.accent;
     var r = parseInt(hex.slice(1, 3), 16);
     var g = parseInt(hex.slice(3, 5), 16);
@@ -82,7 +81,6 @@
         el.querySelector('.si-dot').textContent = '✓';
       } else {
         el.querySelector('.si-dot').textContent = String(n);
-        // Current step = first incomplete
         if (!isComplete(n) && (n === 1 || isComplete(n - 1))) {
           el.classList.add('active');
         }
@@ -120,7 +118,6 @@
       el.classList.toggle('active',   isCurrent || (complete && el.classList.contains('active')));
       el.classList.toggle('complete', complete);
 
-      // Summary tag
       var sumEl = el.querySelector('.step-selection');
       if (sumEl) sumEl.textContent = stepSummary(n);
     }
@@ -145,7 +142,6 @@
     for (var n = 1; n <= 5; n++) {
       if (!isComplete(n)) {
         openStep(n);
-        // Scroll into view
         if (elSteps[n]) {
           setTimeout(function () {
             elSteps[n] && elSteps[n].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -187,7 +183,6 @@
   function onBrandSelect(key) {
     if (state.brand === key) return;
     state.brand           = key;
-    // Reset downstream steps
     state.image           = null;
     state.layout          = null;
     state.messagePreset   = null;
@@ -197,7 +192,7 @@
 
     setAccent(key);
     syncBrandGrid();
-    buildImageGrid(); // rebuild with new pool
+    buildImageGrid();
     clearLayoutPills();
     clearPreset();
     clearCTA();
@@ -221,7 +216,6 @@
     if (!state.brand) return;
 
     var poolKey = BRANDS[state.brand].imagePool;
-    // Try state.images first, fall back to global IMAGES_DATA directly
     var src  = (state.images && state.images[poolKey] && state.images[poolKey].length)
                ? state.images
                : (typeof IMAGES_DATA !== 'undefined' ? IMAGES_DATA : {});
@@ -243,7 +237,8 @@
       div.dataset.id = img.id;
 
       var imgEl = document.createElement('img');
-      imgEl.src = img.file;
+      // Prefer the 1:1 file for the square thumbnail; fall back to 9:16 or legacy .file
+      imgEl.src = img.file11 || img.file916 || img.file || '';
       imgEl.alt = img.label;
       imgEl.loading = 'lazy';
 
@@ -260,7 +255,7 @@
 
   function onImageSelect(img) {
     state.image  = img;
-    state.layout = null;  // reset layout — different image may have different options
+    state.layout = null;
     CANVAS.resetSeeds();
     syncImageGrid();
     buildLayoutPills(img.layouts || []);
@@ -276,11 +271,10 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     STEP 3 — Layout selection
+     STEP 3 — Layout selection (left + center only)
   ══════════════════════════════════════════════════════════ */
   var LAYOUT_DEFS = {
     left:   { label: 'Left-Aligned',  diag: 'l' },
-    right:  { label: 'Right-Aligned', diag: 'r' },
     center: { label: 'Centered',      diag: 'c' }
   };
 
@@ -371,7 +365,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     STEP 5 — CTA
+     STEP 5 — Action text
   ══════════════════════════════════════════════════════════ */
   function buildCTAGrid() {
     CTA_OPTIONS.forEach(function (text) {
@@ -401,7 +395,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     STEP HEADER clicks (collapse / expand)
+     STEP HEADER clicks
   ══════════════════════════════════════════════════════════ */
   function wireStepHeaders() {
     for (var n = 1; n <= 5; n++) {
@@ -412,7 +406,6 @@
           if (elSteps[num].classList.contains('locked')) return;
           var isOpen = elSteps[num].classList.contains('active');
           if (isOpen && isComplete(num)) {
-            // Collapse completed step
             elSteps[num].classList.remove('active');
           } else {
             openStep(num);
@@ -441,7 +434,6 @@
   function onExport() {
     if (!allComplete()) return;
 
-    // Hide button, show progress
     elBtnExport.style.display    = 'none';
     elProgressWrap.style.display = 'flex';
     elSuccessState.style.display = 'none';
@@ -453,7 +445,6 @@
         elProgressLabel.textContent = label || '';
       },
       function (info) {
-        // Success
         elProgressWrap.style.display = 'none';
 
         var vidLabel = info.videoExt === 'webm' ? 'WebM (rename to .mp4 if needed)' : 'MP4';
@@ -463,8 +454,8 @@
             '<span class="success-title">Package downloaded!</span>' +
           '</div>' +
           '<div class="success-files">' +
-            '<div class="success-file">banner-1x1.png <span>' + info.png11Size + ' KB</span></div>' +
-            '<div class="success-file">banner-1x1.gif <span>' + info.gif11Size + ' KB</span></div>' +
+            '<div class="success-file">banner-1x1.png <span>'  + info.png11Size  + ' KB</span></div>' +
+            '<div class="success-file">banner-1x1.gif <span>'  + info.gif11Size  + ' KB</span></div>' +
             '<div class="success-file">banner-9x16.png <span>' + info.png916Size + ' KB</span></div>' +
             '<div class="success-file">banner-9x16.' + info.videoExt +
               ' <span class="' + (info.videoExt === 'webm' ? 'webm' : '') + '">' + info.vidSize + ' KB</span></div>' +
@@ -482,12 +473,10 @@
         if (restartBtn) restartBtn.addEventListener('click', onRestart);
       },
       function (errMsg) {
-        // Error
         elProgressWrap.style.display = 'none';
         elProgressLabel.textContent  = '✗ ' + errMsg;
         elProgressLabel.style.color  = 'var(--terr)';
         elProgressWrap.style.display = 'flex';
-        // Re-show button after delay
         setTimeout(function () {
           elProgressWrap.style.display = 'none';
           elBtnExport.style.display    = '';
@@ -502,7 +491,7 @@
     state.brand           = null;
     state.image           = null;
     state.layout          = null;
-    state.messageMode     = 'preset';
+    state.messageMode     = 'position';
     state.messagePreset   = null;
     state.messagePosition = '';
     state.cta             = null;
@@ -515,14 +504,13 @@
     clearPreset();
     clearCTA();
 
-    // Reset mode toggle UI
+    // Reset mode toggle UI — position is default
     document.querySelectorAll('.radio-btn').forEach(function (el) {
-      el.classList.toggle('active', el.dataset.mode === 'preset');
+      el.classList.toggle('active', el.dataset.mode === 'position');
     });
-    if (elPresetMode) elPresetMode.classList.remove('hidden');
-    if (elPosMode)    elPosMode.classList.remove('visible');
+    if (elPresetMode) elPresetMode.classList.add('hidden');
+    if (elPosMode)    elPosMode.classList.add('visible');
 
-    // Reset export area
     elSuccessState.style.display = 'none';
     elProgressWrap.style.display = 'none';
     elBtnExport.style.display    = '';
@@ -537,11 +525,8 @@
      INIT
   ══════════════════════════════════════════════════════════ */
   function init() {
-    // Init canvases
     CANVAS.init($('canvas-11'), $('canvas-916'));
 
-    // Read image manifest from the embedded JSON block in index.html
-    // (works on file://, Netlify, and any sandboxed preview — no fetch, no global vars)
     try {
       var el = document.getElementById('images-data-block');
       state.images = el ? JSON.parse(el.textContent) : {};
@@ -550,7 +535,6 @@
       state.images = {};
     }
 
-    // Build static grids
     buildBrandGrid();
     buildPresetGrid();
     buildCTAGrid();
@@ -574,17 +558,14 @@
       elBtnExport.addEventListener('click', onExport);
     }
 
-    // Step headers + indicator
     wireStepHeaders();
     wireIndicator();
 
-    // Initial render
     renderWizard();
     openStep(1);
     scheduleRender();
   }
 
-  // Boot
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

@@ -66,7 +66,7 @@
       <div class="si-line"></div>
       <div class="si-item" data-step="5">
         <div class="si-dot">5</div>
-        <span class="si-label">CTA</span>
+        <span class="si-label">Action</span>
       </div>
     </div>
 
@@ -122,17 +122,12 @@
       <div class="step-body">
         <!-- Mode toggle -->
         <div class="msg-mode-row">
-          <div class="radio-btn active" data-mode="preset">Preset Copy</div>
-          <div class="radio-btn" data-mode="position">Position Name</div>
+          <div class="radio-btn active" data-mode="position">Position Name</div>
+          <div class="radio-btn" data-mode="preset">General Recruiting Messages</div>
         </div>
 
-        <!-- Preset grid -->
-        <div id="preset-mode" class="preset-mode">
-          <div class="preset-grid" id="preset-grid"></div>
-        </div>
-
-        <!-- Position input -->
-        <div id="pos-mode" class="pos-mode">
+        <!-- Position input (default) -->
+        <div id="pos-mode" class="pos-mode visible">
           <div class="pos-input-wrap">
             <input
               type="text"
@@ -145,6 +140,11 @@
           </div>
           <p class="pos-hint">Job title shown as the banner headline. Keep it to 4 words or under for best results.</p>
         </div>
+
+        <!-- General recruiting messages -->
+        <div id="preset-mode" class="preset-mode hidden">
+          <div class="preset-grid" id="preset-grid"></div>
+        </div>
       </div>
     </div>
 
@@ -152,7 +152,7 @@
     <div class="step locked" id="step-5">
       <div class="step-hd">
         <div class="step-num">5</div>
-        <span class="step-title">Choose CTA</span>
+        <span class="step-title">Choose Action Text</span>
         <span class="step-selection"></span>
       </div>
       <div class="step-body">

@@ -10,29 +10,26 @@ const EXPORT = (function () {
 
   /* ── GIF frame state ─────────────────────────────────── */
   // 45 frames @ 15 fps = 3 s loop
-  // F 0-19  : headline fades in  (0 → 1)
-  // F 34-44 : CTA pulses once    (sin curve)
-  // All:     smoke drifts up
+  // F 0-9  : headline fades in fast
+  // All:    embers drift up, CTA pulses continuously
   function gifFrameState(f) {
-    var msgOpacity = f < 20 ? f / 19 : 1;
-    var ctaPulse   = (f >= 34 && f <= 44) ? (f - 34) / 10 : 0;
+    // Faster headline fade-in (done in 10 frames)
+    var msgOpacity = f < 10 ? f / 9 : 1;
+    // Continuous CTA sine pulse — peaks roughly every 15 frames
+    // Value ranges 0→1→0, giving a smooth "breathe" effect
+    var ctaPulse = (Math.sin(f * (Math.PI * 2 / 15)) * 0.5 + 0.5);
     return { msgOpacity: msgOpacity, ctaPulse: ctaPulse };
   }
 
   /* ── MP4 frame state ─────────────────────────────────── */
   // 10 s loop @ 30 fps
-  // Headline fades in from t=0.5 → 1.5 s
-  // CTA pulses at t=3, 6, 9 s (each lasts 0.5 s)
   function mp4FrameState(frame, fps) {
     var t = frame / fps;
-    var msgOpacity = t < 0.5  ? 0 :
-                     t < 1.5  ? (t - 0.5) :
+    var msgOpacity = t < 0.35 ? 0 :
+                     t < 1.1  ? (t - 0.35) / 0.75 :
                      1;
-    var ctaPulse = 0;
-    [3, 6, 9].forEach(function (pt) {
-      var dt = t - pt;
-      if (dt >= 0 && dt < 0.5) ctaPulse = dt / 0.5;
-    });
+    // Continuous pulse matching GIF rhythm
+    var ctaPulse = (Math.sin(t * Math.PI * 2 / 1.0) * 0.5 + 0.5);
     return { msgOpacity: msgOpacity, ctaPulse: ctaPulse };
   }
 
@@ -45,7 +42,6 @@ const EXPORT = (function () {
       oc.height = s.h;
       var ctx = oc.getContext('2d');
 
-      // Static frame — smoke at frame 0, all text fully visible
       CANVAS.renderToCtx(ctx, s, state, 0, { msgOpacity: 1, ctaPulse: 0 }, is916)
         .then(function () {
           oc.toBlob(function (blob) {
@@ -71,7 +67,7 @@ const EXPORT = (function () {
 
       var gif = new GIF({
         workers:      2,
-        quality:      8,
+        quality:      3,          // 1=best, lower = sharper colors (was 8)
         width:        CANVAS.S11.w,
         height:       CANVAS.S11.h,
         workerScript: 'gif.worker.js'
@@ -101,10 +97,9 @@ const EXPORT = (function () {
   function makeVideo(state, onProgress) {
     return new Promise(function (resolve, reject) {
       var FPS      = 30;
-      var DURATION = 10; // seconds
+      var DURATION = 10;
       var S        = CANVAS.S916;
 
-      // Check mime type support
       var mime = 'video/webm;codecs=vp9';
       var ext  = 'webm';
       if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) {
@@ -148,7 +143,7 @@ const EXPORT = (function () {
       var frameNum = 0;
       var startMs  = null;
 
-      recorder.start(200); // collect every 200 ms
+      recorder.start(200);
 
       function tick(ts) {
         if (startMs === null) startMs = ts;
@@ -172,11 +167,8 @@ const EXPORT = (function () {
           });
       }
 
-      // Pre-render frame 0 so the canvas isn't blank at start
       CANVAS.renderToCtx(ctx, S, state, 0, mp4FrameState(0, FPS), true)
-        .then(function () {
-          requestAnimationFrame(tick);
-        })
+        .then(function () { requestAnimationFrame(tick); })
         .catch(reject);
     });
   }
@@ -234,7 +226,6 @@ const EXPORT = (function () {
       })
       .then(function (zipBlob) {
         step(100, 'Done!');
-        // Trigger download
         var url = URL.createObjectURL(zipBlob);
         var a   = document.createElement('a');
         a.href     = url;
@@ -245,7 +236,7 @@ const EXPORT = (function () {
         URL.revokeObjectURL(url);
 
         if (onComplete) onComplete({
-          videoExt: videoResult.ext,
+          videoExt:   videoResult.ext,
           png11Size:  (png11.size  / 1024).toFixed(0),
           gif11Size:  (gif11.size  / 1024).toFixed(0),
           png916Size: (png916.size / 1024).toFixed(0),

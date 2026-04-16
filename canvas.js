@@ -27,13 +27,26 @@ const CANVAS = (function () {
     };
   }
 
+  /* ── Hex → RGB ─────────────────────────────────────────── */
+  function hexToRGB(hex) {
+    var r = parseInt(hex.slice(1, 3), 16);
+    var g = parseInt(hex.slice(3, 5), 16);
+    var b = parseInt(hex.slice(5, 7), 16);
+    return { r: r, g: g, b: b };
+  }
+
   /* ── Image loading with cache ──────────────────────────── */
   function loadImg(src) {
+    if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
     return new Promise(function (res, rej) {
       var img = new Image();
+      // crossOrigin MUST be set before .src — required so canvas.toBlob()
+      // doesn't throw "tainted canvas". Netlify serves all assets with
+      // Access-Control-Allow-Origin: * so this always succeeds.
+      img.crossOrigin = 'anonymous';
       img.onload  = function () { _imgCache[src] = img; res(img); };
-      img.onerror = function () { rej(new Error('Image load failed: ' + src)); };
+      img.onerror = function () { res(null); }; // skip missing images gracefully
       img.src = src;
     });
   }
@@ -49,75 +62,109 @@ const CANVAS = (function () {
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
-  /* ── Smoke seed generation ─────────────────────────────── */
+  /* ── Smoke & ember seed generation ────────────────────── */
   function genSeeds(w, h, seed) {
     var r = mkRng(seed);
     var wisps = [], dots = [];
 
-    // Smoke wisps — weighted toward bottom 40 %
-    for (var i = 0; i < 22; i++) {
+    // Smoke wisps — weighted toward bottom 50%
+    for (var i = 0; i < 28; i++) {
       wisps.push({
         x:   r() * w,
-        y:   h * 0.55 + r() * h * 0.45,
-        rad: 65 + r() * 155,
-        op:  0.025 + r() * 0.035,
-        spd: 0.30 + r() * 0.25   // upward drift px/frame
+        y:   h * 0.5 + r() * h * 0.5,
+        rad: 80 + r() * 180,
+        op:  0.05 + r() * 0.06,
+        spd: 0.35 + r() * 0.30
       });
     }
-
     // Extra thin wisps spread across canvas
-    for (var j = 0; j < 10; j++) {
+    for (var j = 0; j < 12; j++) {
       wisps.push({
         x:   r() * w,
         y:   r() * h,
-        rad: 40 + r() * 60,
-        op:  0.012 + r() * 0.018,
+        rad: 50 + r() * 80,
+        op:  0.02 + r() * 0.025,
         spd: 0.20 + r() * 0.20
       });
     }
 
-    // Particles — bias toward bottom text zone
-    var nDots = Math.round((w * h) / 11000);
+    // Ember particles — denser and more visible than before
+    // ~2× more particles, 30% are "bright" embers
+    var nDots = Math.round((w * h) / 5500);
     for (var k = 0; k < nDots; k++) {
-      var bias = r();
+      var bias     = r();
+      var isBright = r() < 0.30;
       dots.push({
-        x:   r() * w,
-        y:   bias < 0.65 ? (h * 0.6 + r() * h * 0.4) : r() * h,
-        r:   1 + r(),
-        op:  0.05 + r() * 0.09,
-        spd: 0.22 + r() * 0.32
+        x:            r() * w,
+        y:            bias < 0.70 ? (h * 0.5 + r() * h * 0.5) : r() * h,
+        r:            isBright ? (1.5 + r() * 2.0) : (0.7 + r() * 1.3),
+        op:           isBright ? (0.50 + r() * 0.35) : (0.07 + r() * 0.10),
+        spd:          0.38 + r() * 0.58,
+        flickerPhase: r() * Math.PI * 2
       });
     }
 
     return { wisps: wisps, dots: dots };
   }
 
-  /* ── Smoke rendering (frame 0 = static) ───────────────── */
-  function drawSmoke(ctx, w, h, seeds, frame) {
+  /* ── Smoke & ember rendering ───────────────────────────── */
+  function drawSmoke(ctx, w, h, seeds, frame, emberColor) {
     ctx.save();
     var fr = frame || 0;
 
+    // ── Smoke wisps (dark, always) ──────────────────────
     seeds.wisps.forEach(function (ws) {
       var drift = fr * ws.spd;
       var y = ((ws.y - drift) % (h + ws.rad * 2) + h + ws.rad * 2) % (h + ws.rad * 2) - ws.rad;
       var g = ctx.createRadialGradient(ws.x, y, 0, ws.x, y, ws.rad);
-      g.addColorStop(0, 'rgba(6,6,6,' + (ws.op * 2.4).toFixed(4) + ')');
-      g.addColorStop(0.5, 'rgba(4,4,4,' + ws.op.toFixed(4) + ')');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0,   'rgba(18,18,18,' + (ws.op * 3.0).toFixed(4) + ')');
+      g.addColorStop(0.5, 'rgba(10,10,10,' + (ws.op * 1.5).toFixed(4) + ')');
+      g.addColorStop(1,   'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(ws.x, y, ws.rad, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    seeds.dots.forEach(function (d) {
-      var drift = fr * d.spd;
-      var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
-      ctx.beginPath();
-      ctx.arc(d.x, y, d.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(220,220,220,' + d.op.toFixed(4) + ')';
-      ctx.fill();
-    });
+    // ── Ember particles ─────────────────────────────────
+    if (emberColor) {
+      var rgb = hexToRGB(emberColor);
+      seeds.dots.forEach(function (d) {
+        var drift = fr * d.spd;
+        var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
+        // Flicker: each ember has its own phase offset
+        var flicker = 0.55 + 0.45 * Math.sin(fr * 0.65 + d.flickerPhase);
+        var alpha   = Math.min(1, d.op * flicker);
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(d.x, y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha.toFixed(4) + ')';
+        ctx.fill();
+
+        // Glow halo on bright embers
+        if (d.op > 0.40) {
+          var glowR = d.r * 3.5;
+          var g2    = ctx.createRadialGradient(d.x, y, 0, d.x, y, glowR);
+          g2.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + (alpha * 0.35).toFixed(4) + ')');
+          g2.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
+          ctx.beginPath();
+          ctx.arc(d.x, y, glowR, 0, Math.PI * 2);
+          ctx.fillStyle = g2;
+          ctx.fill();
+        }
+      });
+    } else {
+      // Tebex: very subtle neutral dust only
+      seeds.dots.forEach(function (d) {
+        var drift = fr * d.spd;
+        var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
+        ctx.beginPath();
+        ctx.arc(d.x, y, d.r * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(180,180,180,' + (d.op * 0.25).toFixed(4) + ')';
+        ctx.fill();
+      });
+    }
 
     ctx.restore();
   }
@@ -128,15 +175,10 @@ const CANVAS = (function () {
     var LW = 238,  LH = 118;   // logo max
     var TW = 648,  TH = 313;   // title max
     var CW = 475,  CH = 130;   // cta max
-    var ctaTop = H - M - CH;   // 885
-    var titBot = H - 237;      // 843
-    var titTop = titBot - TH;  // 530
+    var titBot = H - 237;      // 843  — bottom of title zone
+    var titTop = titBot - TH;  // 530  — top of title zone
+    var ctaTop = titBot + 14;  // 857  — tight gap (was H-M-CH = 885)
 
-    if (lay === 'right') return {
-      logo:  { x: W - M - LW,       y: M,      w: LW, h: LH, al: 'right'  },
-      title: { x: W - M - TW,       y: titTop, w: TW, h: TH, al: 'right'  },
-      cta:   { x: W - M - CW,       y: ctaTop, w: CW, h: CH, al: 'right'  }
-    };
     if (lay === 'center') return {
       logo:  { x: (W - LW) / 2,     y: M,      w: LW, h: LH, al: 'center' },
       title: { x: (W - TW) / 2,     y: titTop, w: TW, h: TH, al: 'center' },
@@ -157,11 +199,6 @@ const CANVAS = (function () {
     var CW = 648,  CH = 99;
     var SAFE = 270;
 
-    if (lay === 'right') return {
-      logo:  { x: W - M - LW,       y: SAFE, w: LW, h: LH, al: 'right'  },
-      title: { x: W - M - TW,       y: 1000, w: TW, h: TH, al: 'right'  },
-      cta:   { x: W - M - CW,       y: 1360, w: CW, h: CH, al: 'right'  }
-    };
     if (lay === 'center') return {
       logo:  { x: (W - LW) / 2,     y: SAFE, w: LW, h: LH, al: 'center' },
       title: { x: (W - TW) / 2,     y: 1000, w: TW, h: TH, al: 'center' },
@@ -220,12 +257,12 @@ const CANVAS = (function () {
     var tz = zones.title;
     var cz = zones.cta;
 
-    // Headline
+    // ── Headline ──────────────────────────────────────────
     var maxStartSz = is916 ? 110 : 96;
-    var fit = fitFont(ctx, msg, tz.w, tz.h, maxStartSz, BF);
-    var sz    = fit.sz;
-    var lines = fit.lines;
-    var lineH = sz * 1.25;
+    var fit    = fitFont(ctx, msg, tz.w, tz.h, maxStartSz, BF);
+    var sz     = fit.sz;
+    var lines  = fit.lines;
+    var lineH  = sz * 1.25;
     var totalH = lines.length * lineH;
     var startY = tz.y + (tz.h - totalH) / 2 + lineH / 2;
 
@@ -234,13 +271,13 @@ const CANVAS = (function () {
                                        tz.x + tz.w / 2;
 
     ctx.save();
-    ctx.globalAlpha  = msgOpacity;
-    ctx.font         = '800 ' + sz + 'px ' + BF;
-    ctx.fillStyle    = '#FFFFFF';
-    ctx.textAlign    = tz.al;
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor  = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur   = sz * 0.35;
+    ctx.globalAlpha   = msgOpacity;
+    ctx.font          = '800 ' + sz + 'px ' + BF;
+    ctx.fillStyle     = '#FFFFFF';
+    ctx.textAlign     = tz.al;
+    ctx.textBaseline  = 'middle';
+    ctx.shadowColor   = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur    = sz * 0.35;
     ctx.shadowOffsetY = sz * 0.05;
 
     lines.forEach(function (line, i) {
@@ -248,37 +285,63 @@ const CANVAS = (function () {
     });
     ctx.restore();
 
-    // CTA button
+    // ── CTA button ────────────────────────────────────────
     var ctaFontSz = is916 ? 42 : 32;
     ctx.save();
     ctx.font = '700 ' + ctaFontSz + 'px ' + LF;
-    var txtW = ctx.measureText(cta).width;
-    var padH = is916 ? 36 : 32;   // horizontal padding
-    var padV = is916 ? 22 : 18;   // vertical padding
-    var btnW = Math.min(cz.w, txtW + padH * 2);
-    var btnH = Math.min(cz.h, ctaFontSz + padV * 2);
+    var txtW  = ctx.measureText(cta).width;
+    var padH  = is916 ? 36 : 32;
+    var padV  = is916 ? 22 : 18;
+    var btnW  = Math.min(cz.w, txtW + padH * 2);
+    var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
     var bx = cz.al === 'left'   ? cz.x :
              cz.al === 'right'  ? cz.x + cz.w - btnW :
                                    cz.x + (cz.w - btnW) / 2;
     var by = cz.y + (cz.h - btnH) / 2;
 
-    // Pulse scale transform
-    var scale = 1 + Math.sin(ctaPulse * Math.PI) * 0.03;
+    // Pulse: smooth scale + accent glow
+    var scale = 1 + ctaPulse * 0.07;
     ctx.translate(bx + btnW / 2, by + btnH / 2);
     ctx.scale(scale, scale);
 
+    // Glow layer (prominent when ctaPulse > 0.2)
+    if (ctaPulse > 0.15) {
+      var glowSize = ctaPulse * 28;
+      var rgb      = hexToRGB(brand.accent);
+      var glowAlpha = ctaPulse * 0.55;
+      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, btnW * 0.8);
+      g.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + glowAlpha.toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
+      ctx.beginPath();
+      ctx.rect(-btnW / 2 - glowSize, -btnH / 2 - glowSize,
+               btnW + glowSize * 2, btnH + glowSize * 2);
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+
+    // Button fill
     ctx.fillStyle = brand.accent;
     ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
 
+    // Button text
     ctx.fillStyle    = brand.ctaTextColor;
     ctx.font         = '700 ' + ctaFontSz + 'px ' + LF;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor  = 'rgba(0,0,0,0)'; // no shadow on CTA text
+    ctx.shadowColor  = 'rgba(0,0,0,0)';
     ctx.shadowBlur   = 0;
     ctx.fillText(cta, 0, 0);
     ctx.restore();
+  }
+
+  /* helper used inside drawText */
+  function hexToRGB(hex) {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16)
+    };
   }
 
   /* ── Logo rendering ────────────────────────────────────── */
@@ -300,9 +363,13 @@ const CANVAS = (function () {
     var msg   = state.messageMode === 'preset' ? state.messagePreset : state.messagePosition;
     var cta   = state.cta;
 
-    // Load assets (cached after first call)
+    // Use the correct format image for each output size
+    var imgSrc = is916
+      ? ((state.image && (state.image.file916 || state.image.file11 || state.image.file)) || null)
+      : ((state.image && (state.image.file11  || state.image.file916 || state.image.file)) || null);
+
     var results = await Promise.all([
-      state.image ? loadImg(state.image.file).catch(function () { return null; }) : Promise.resolve(null),
+      imgSrc ? loadImg(imgSrc).catch(function () { return null; }) : Promise.resolve(null),
       loadImg(brand.logo).catch(function () { return null; })
     ]);
     var bgImg   = results[0];
@@ -321,7 +388,7 @@ const CANVAS = (function () {
     var zones = is916 ? getZones916(lay) : getZones11(lay);
 
     drawBg(ctx, bgImg, w, h);
-    drawSmoke(ctx, w, h, seeds, frame || 0);
+    drawSmoke(ctx, w, h, seeds, frame || 0, brand.emberColor || null);
     if (msg && cta) drawText(ctx, zones, brand, msg, cta, is916, fstate || {});
     drawLogo(ctx, logoImg, zones.logo);
   }
@@ -329,24 +396,16 @@ const CANVAS = (function () {
   /* ── Public render (both canvases) ────────────────────── */
   async function render(state, frame, fstate) {
     if (!state || !state.brand) {
-      // Blank slate
       [{ ctx: _x11, s: S11 }, { ctx: _x916, s: S916 }].forEach(function (p) {
         p.ctx.fillStyle = '#080808';
         p.ctx.fillRect(0, 0, p.s.w, p.s.h);
-        // Subtle brand grid placeholder
         p.ctx.strokeStyle = 'rgba(255,255,255,0.04)';
         p.ctx.lineWidth = 1;
         for (var x = 0; x < p.s.w; x += 120) {
-          p.ctx.beginPath();
-          p.ctx.moveTo(x, 0);
-          p.ctx.lineTo(x, p.s.h);
-          p.ctx.stroke();
+          p.ctx.beginPath(); p.ctx.moveTo(x, 0); p.ctx.lineTo(x, p.s.h); p.ctx.stroke();
         }
         for (var y = 0; y < p.s.h; y += 120) {
-          p.ctx.beginPath();
-          p.ctx.moveTo(0, y);
-          p.ctx.lineTo(p.s.w, y);
-          p.ctx.stroke();
+          p.ctx.beginPath(); p.ctx.moveTo(0, y); p.ctx.lineTo(p.s.w, y); p.ctx.stroke();
         }
       });
       return;
@@ -366,7 +425,7 @@ const CANVAS = (function () {
     _c916.width = S916.w;  _c916.height = S916.h;
   }
 
-  /* ── Invalidate seed cache (call after brand/image change) */
+  /* ── Invalidate seed cache ─────────────────────────────── */
   function resetSeeds() { _seeds = null; _seedKey = ''; }
 
   return {

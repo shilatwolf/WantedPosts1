@@ -607,15 +607,15 @@ body {
   color:var(--t3);
 }
 #canvas-11 {
-  width:248px;
-  height:248px;
+  width:320px;
+  height:320px;
   display:block;
   border:1px solid var(--b4);
   border-radius:3px;
 }
 #canvas-916 {
-  width:140px;
-  height:248px;
+  width:180px;
+  height:320px;
   display:block;
   border:1px solid var(--b4);
   border-radius:3px;
