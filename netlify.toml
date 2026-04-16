@@ -1,2 +1,10 @@
 [build]
   publish = "."
+
+# Serve all assets with CORS headers so canvas.toBlob() never throws
+# "Tainted canvases may not be exported" — required when crossOrigin='anonymous'
+# is set on images drawn to an HTML Canvas.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"

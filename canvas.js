@@ -35,21 +35,43 @@ const CANVAS = (function () {
     return { r: r, g: g, b: b };
   }
 
+  /* ── Blob URL store — kept alive so drawImage never fails ─ */
+  var _blobUrls = {};
+
   /* ── Image loading with cache ──────────────────────────── */
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
     return new Promise(function (res) {
-      // All images are same-origin on Netlify, so a plain <img> load never taints
-      // the canvas and canvas.toBlob() always succeeds.  Using fetch+blob here was
-      // causing silent failures: the picker's <img> tags cache images without CORS
-      // headers, and the subsequent fetch (with different cache semantics) would
-      // sometimes miss or return a blob that decoded to null.
-      // encodeURI converts spaces in filenames ("Castle 1_1.png" → "Castle%201_1.png").
-      var img = new Image();
-      img.onload  = function () { _imgCache[src] = img; res(img); };
-      img.onerror = function () { res(null); };
-      img.src = encodeURI(src);
+      // Strategy: fetch → Blob → object URL → Image.
+      // • Blob-URL images NEVER taint the canvas (they're same-origin by definition).
+      // • We intentionally do NOT revoke the blob URL after onload.
+      //   Revoking immediately caused Chrome to sometimes discard the decoded pixel
+      //   data before drawImage() ran, resulting in a transparent / blank background.
+      //   Keeping the URL alive costs a few KB per image — negligible for this tool.
+      // • encodeURI converts spaces ("Castle 1_1.png" → "Castle%201_1.png").
+      fetch(encodeURI(src))
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        })
+        .then(function (blob) {
+          var blobUrl = URL.createObjectURL(blob);
+          _blobUrls[src] = blobUrl; // keep alive — do NOT revoke
+          var img = new Image();
+          img.onload  = function () { _imgCache[src] = img; res(img); };
+          img.onerror = function () { res(null); };
+          img.src = blobUrl;
+        })
+        .catch(function () {
+          // Fallback: fetch unavailable (e.g. file://) — use crossOrigin so the
+          // canvas stays exportable if the server sends CORS headers.
+          var img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload  = function () { _imgCache[src] = img; res(img); };
+          img.onerror = function () { res(null); };
+          img.src = encodeURI(src);
+        });
     });
   }
 
@@ -176,10 +198,10 @@ const CANVAS = (function () {
     var M  = 65,   W  = 1080, H  = 1080;
     var LW = 238,  LH = 118;   // logo max
     var TW = 648,  TH = 313;   // title max
-    var CW = 475,  CH = 130;   // cta max
+    var CW = 475,  CH = 85;    // cta max — reduced height keeps button snug under title
     var titBot = H - 237;      // 843  — bottom of title zone
     var titTop = titBot - TH;  // 530  — top of title zone
-    var ctaTop = titBot + 14;  // 857  — tight gap (was H-M-CH = 885)
+    var ctaTop = titBot;       // 843  — zero gap: CTA zone starts right at title zone bottom
 
     if (lay === 'center') return {
       logo:  { x: (W - LW) / 2,     y: M,      w: LW, h: LH, al: 'center' },
@@ -289,12 +311,12 @@ const CANVAS = (function () {
 
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
-      var ctaFontSz = is916 ? 42 : 32;
+      var ctaFontSz = is916 ? 42 : 36;   // 1:1 bumped 32→36 for better presence
       ctx.save();
       ctx.font = '700 ' + ctaFontSz + 'px ' + LF;
       var txtW  = ctx.measureText(cta).width;
-      var padH  = is916 ? 36 : 32;
-      var padV  = is916 ? 22 : 18;
+      var padH  = is916 ? 36 : 34;       // slightly wider padding for 1:1
+      var padV  = is916 ? 22 : 20;       // slightly taller padding for 1:1
       var btnW  = Math.min(cz.w, txtW + padH * 2);
       var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
@@ -432,8 +454,14 @@ const CANVAS = (function () {
     _c916.width = S916.w;  _c916.height = S916.h;
   }
 
-  /* ── Invalidate seed cache ─────────────────────────────── */
-  function resetSeeds() { _seeds = null; _seedKey = ''; }
+  /* ── Invalidate seed + image cache ────────────────────── */
+  function resetSeeds() {
+    _seeds = null; _seedKey = '';
+    // Revoke any stored blob URLs and clear caches on brand switch / restart
+    Object.keys(_blobUrls).forEach(function (k) { URL.revokeObjectURL(_blobUrls[k]); });
+    Object.keys(_blobUrls).forEach(function (k) { delete _blobUrls[k]; });
+    Object.keys(_imgCache).forEach(function (k) { delete _imgCache[k]; });
+  }
 
   return {
     init:        init,
