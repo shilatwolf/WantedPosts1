@@ -35,15 +35,56 @@ const CANVAS = (function () {
     return { r: r, g: g, b: b };
   }
 
-  /* ── Image loader (shared by preview + export) ───────────
-     Netlify static assets are always same-origin. Same-origin
-     images loaded with new Image() NEVER taint the canvas — so
-     canvas.toBlob() always works. No fetch, no blob URLs, no CORS
-     gymnastics needed. Just a plain cached image load.
-     encodeURI handles spaces: "Castle 1_1.png" → "Castle%201_1.png" */
+  /* ── Image loader ────────────────────────────────────────
+     Raster images (PNG/JPG): plain new Image(). Same-origin
+     rasters never taint the canvas — fast and simple.
+
+     SVG images: MUST go through fetch → Blob → createObjectURL.
+     Chrome taints the canvas when you draw an SVG loaded via
+     new Image(), even if it's same-origin, because SVGs can embed
+     external resources. A blob: URL sandboxes the SVG and the
+     canvas stays untainted so canvas.toBlob() always works.
+
+     encodeURI: "Castle 1_1.png" → "Castle%201_1.png"            */
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
+
+    var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
+
+    if (isSvg) {
+      // SVG path: fetch → Blob → blob: URL → Image (no canvas taint)
+      return new Promise(function (res) {
+        fetch(encodeURI(src))
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+          })
+          .then(function (blob) {
+            // Re-type as image/svg+xml so Image() decodes it correctly
+            var typed  = new Blob([blob], { type: 'image/svg+xml' });
+            var blobUrl = URL.createObjectURL(typed);
+            var img = new Image();
+            img.onload = function () {
+              _imgCache[src] = img;
+              // Keep blob URL alive — revoking too early can blank the image
+              res(img);
+            };
+            img.onerror = function () {
+              URL.revokeObjectURL(blobUrl);
+              console.warn('[CANVAS] SVG decode failed:', src);
+              res(null);
+            };
+            img.src = blobUrl;
+          })
+          .catch(function (err) {
+            console.warn('[CANVAS] SVG fetch failed:', src, err);
+            res(null);
+          });
+      });
+    }
+
+    // Raster path: plain Image, same-origin, never taints
     return new Promise(function (res) {
       var img = new Image();
       img.onload  = function () { _imgCache[src] = img; res(img); };
@@ -55,8 +96,7 @@ const CANVAS = (function () {
     });
   }
 
-  /* loadImgForExport is the same as loadImg — kept as alias so
-     export.js doesn't need changes (forExport flag selects it). */
+  /* loadImgForExport = same loader (SVG path already untainted) */
   var loadImgForExport = loadImg;
 
   /* ── Pre-warm image cache ────────────────────────────────
