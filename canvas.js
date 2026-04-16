@@ -53,16 +53,28 @@ const CANVAS = (function () {
     var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
 
     if (isSvg) {
-      // SVG path: fetch → Blob → blob: URL → Image (no canvas taint)
+      // SVG path: fetch → Blob → blob: URL → Image
+      // Using a blob: URL prevents canvas taint (required for toBlob() on export).
+      // Falls back to plain new Image() when fetch is unavailable (file:// local dev).
       return new Promise(function (res) {
+        function fallback() {
+          // file:// or fetch unsupported: plain Image (canvas may taint, but
+          // export only runs on Netlify where fetch works, so this is fine)
+          var img = new Image();
+          img.onload  = function () { _imgCache[src] = img; res(img); };
+          img.onerror = function () { res(null); };
+          img.src = encodeURI(src);
+        }
+
+        if (!window.fetch) { fallback(); return; }
+
         fetch(encodeURI(src))
           .then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.blob();
           })
           .then(function (blob) {
-            // Re-type as image/svg+xml so Image() decodes it correctly
-            var typed  = new Blob([blob], { type: 'image/svg+xml' });
+            var typed   = new Blob([blob], { type: 'image/svg+xml' });
             var blobUrl = URL.createObjectURL(typed);
             var img = new Image();
             img.onload = function () {
@@ -72,14 +84,12 @@ const CANVAS = (function () {
             };
             img.onerror = function () {
               URL.revokeObjectURL(blobUrl);
-              console.warn('[CANVAS] SVG decode failed:', src);
-              res(null);
+              fallback(); // blob decode failed — try direct load
             };
             img.src = blobUrl;
           })
-          .catch(function (err) {
-            console.warn('[CANVAS] SVG fetch failed:', src, err);
-            res(null);
+          .catch(function () {
+            fallback(); // fetch blocked (file://) — use plain Image
           });
       });
     }
