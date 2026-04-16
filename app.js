@@ -431,9 +431,7 @@
   /* ═══════════════════════════════════════════════════════
      EXPORT
   ══════════════════════════════════════════════════════════ */
-  function onExport() {
-    if (!allComplete()) return;
-
+  function _runExport(dirHandle) {
     elBtnExport.style.display    = 'none';
     elProgressWrap.style.display = 'flex';
     elSuccessState.style.display = 'none';
@@ -497,8 +495,38 @@
           elProgressLabel.style.color  = '';
         }, 4000);
       },
-      filename
+      filename,
+      dirHandle   // FileSystemDirectoryHandle (or null → ZIP fallback)
     );
+  }
+
+  function onExport() {
+    if (!allComplete()) return;
+
+    // showDirectoryPicker MUST be called synchronously inside this click
+    // handler while the user-gesture token is still alive.  The rendering
+    // pipeline (PNG + GIF + 10 s video) takes many seconds, so by the time
+    // it finishes the gesture has expired and the browser throws:
+    //   "Must be handling a user gesture to show a file picker."
+    // Solution: call the picker HERE, get the directory handle, then pass
+    // it into generatePackage which uses it after rendering is done.
+    if (window.showDirectoryPicker) {
+      elBtnExport.disabled = true;   // prevent double-click while picker is open
+      window.showDirectoryPicker({ id: 'banner-export', startIn: 'downloads', mode: 'readwrite' })
+        .then(function (dirHandle) {
+          elBtnExport.disabled = false;
+          _runExport(dirHandle);
+        })
+        .catch(function (err) {
+          elBtnExport.disabled = false;
+          if (err && err.name === 'AbortError') return; // user closed picker — do nothing
+          console.warn('[APP] showDirectoryPicker failed, falling back to ZIP', err);
+          _runExport(null);
+        });
+      return;
+    }
+
+    _runExport(null); // no showDirectoryPicker — fall back to ZIP
   }
 
   /* ── Start over ──────────────────────────────────────── */

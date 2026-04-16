@@ -14,7 +14,9 @@ const CANVAS = (function () {
   const S11  = { w: 1080, h: 1080 };
   const S916 = { w: 1080, h: 1920 };
 
-  const _imgCache = {};
+  const _imgCache       = {};   // preview — plain Image, may taint (never toBlob'd)
+  const _exportImgCache = {};   // export  — blob: URL, never taints
+  const _exportBlobUrls = {};   // kept alive so drawImage always works in export
   let _seeds = null;
   let _seedKey = '';
 
@@ -35,21 +37,32 @@ const CANVAS = (function () {
     return { r: r, g: g, b: b };
   }
 
-  /* ── Blob URL store — kept alive so drawImage never fails ─ */
-  var _blobUrls = {};
-
-  /* ── Image loading with cache ──────────────────────────── */
+  /* ── PREVIEW image loader ────────────────────────────────
+     Plain Image — loads fast from browser cache, no CORS needed.
+     The live preview canvas may become "tainted" but we NEVER call
+     toBlob() on it, so the taint is harmless.                   */
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
     return new Promise(function (res) {
-      // Strategy: fetch → Blob → object URL → Image.
-      // • Blob-URL images NEVER taint the canvas (they're same-origin by definition).
-      // • We intentionally do NOT revoke the blob URL after onload.
-      //   Revoking immediately caused Chrome to sometimes discard the decoded pixel
-      //   data before drawImage() ran, resulting in a transparent / blank background.
-      //   Keeping the URL alive costs a few KB per image — negligible for this tool.
-      // • encodeURI converts spaces ("Castle 1_1.png" → "Castle%201_1.png").
+      var img = new Image();
+      img.onload  = function () { _imgCache[src] = img; res(img); };
+      img.onerror = function () { res(null); };
+      img.src = encodeURI(src);   // encodeURI: "Castle 1_1.png" → "Castle%201_1.png"
+    });
+  }
+
+  /* ── EXPORT image loader ─────────────────────────────────
+     fetch → Blob → createObjectURL → Image.
+     Blob-URL images are always same-origin so canvas.toBlob()
+     NEVER throws "Tainted canvases may not be exported",
+     regardless of whether the original URL is cross-origin CDN.
+     We keep the blob URL alive (no revoke) so drawImage()
+     always has valid pixel data to work with.                  */
+  function loadImgForExport(src) {
+    if (!src) return Promise.resolve(null);
+    if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
+    return new Promise(function (res) {
       fetch(encodeURI(src))
         .then(function (r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -57,20 +70,15 @@ const CANVAS = (function () {
         })
         .then(function (blob) {
           var blobUrl = URL.createObjectURL(blob);
-          _blobUrls[src] = blobUrl; // keep alive — do NOT revoke
+          _exportBlobUrls[src] = blobUrl;   // keep alive — do NOT revoke
           var img = new Image();
-          img.onload  = function () { _imgCache[src] = img; res(img); };
+          img.onload  = function () { _exportImgCache[src] = img; res(img); };
           img.onerror = function () { res(null); };
           img.src = blobUrl;
         })
-        .catch(function () {
-          // Fallback: fetch unavailable (e.g. file://) — use crossOrigin so the
-          // canvas stays exportable if the server sends CORS headers.
-          var img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload  = function () { _imgCache[src] = img; res(img); };
-          img.onerror = function () { res(null); };
-          img.src = encodeURI(src);
+        .catch(function (err) {
+          console.warn('[CANVAS] export image load failed:', src, err);
+          res(null);
         });
     });
   }
@@ -380,10 +388,11 @@ const CANVAS = (function () {
   }
 
   /* ── Core renderer (single canvas + ctx) ──────────────── */
-  async function renderToCtx(ctx, spec, state, frame, fstate, is916) {
+  // forExport = true  → uses loadImgForExport (fetch+blob, never taints, safe for toBlob)
+  // forExport = false → uses loadImg (plain Image, fast, may taint — preview only)
+  async function renderToCtx(ctx, spec, state, frame, fstate, is916, forExport) {
     var w = spec.w, h = spec.h;
-    // NOTE: no clearRect here — drawBg fills the entire canvas with fillRect,
-    // so clearRect is redundant and causes a blank-frame flash in video capture.
+    var loader = forExport ? loadImgForExport : loadImg;
 
     var brand = BRANDS[state.brand];
     var lay   = state.layout || 'left';
@@ -396,8 +405,8 @@ const CANVAS = (function () {
       : ((state.image && (state.image.file11  || state.image.file916 || state.image.file)) || null);
 
     var results = await Promise.all([
-      imgSrc ? loadImg(imgSrc).catch(function () { return null; }) : Promise.resolve(null),
-      loadImg(brand.logo).catch(function () { return null; })
+      imgSrc ? loader(imgSrc).catch(function () { return null; }) : Promise.resolve(null),
+      loader(brand.logo).catch(function () { return null; })
     ]);
     var bgImg   = results[0];
     var logoImg = results[1];
@@ -454,13 +463,17 @@ const CANVAS = (function () {
     _c916.width = S916.w;  _c916.height = S916.h;
   }
 
-  /* ── Invalidate seed + image cache ────────────────────── */
+  /* ── Invalidate seed + image caches ───────────────────── */
   function resetSeeds() {
     _seeds = null; _seedKey = '';
-    // Revoke any stored blob URLs and clear caches on brand switch / restart
-    Object.keys(_blobUrls).forEach(function (k) { URL.revokeObjectURL(_blobUrls[k]); });
-    Object.keys(_blobUrls).forEach(function (k) { delete _blobUrls[k]; });
+    // Clear preview cache
     Object.keys(_imgCache).forEach(function (k) { delete _imgCache[k]; });
+    // Revoke export blob URLs and clear export caches
+    Object.keys(_exportBlobUrls).forEach(function (k) {
+      URL.revokeObjectURL(_exportBlobUrls[k]);
+      delete _exportBlobUrls[k];
+    });
+    Object.keys(_exportImgCache).forEach(function (k) { delete _exportImgCache[k]; });
   }
 
   return {
