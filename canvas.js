@@ -14,9 +14,7 @@ const CANVAS = (function () {
   const S11  = { w: 1080, h: 1080 };
   const S916 = { w: 1080, h: 1920 };
 
-  const _imgCache       = {};   // preview — plain Image, may taint (never toBlob'd)
-  const _exportImgCache = {};   // export  — blob: URL, never taints
-  const _exportBlobUrls = {};   // kept alive so drawImage always works in export
+  const _imgCache = {};   // shared by preview + export
   let _seeds = null;
   let _seedKey = '';
 
@@ -37,72 +35,40 @@ const CANVAS = (function () {
     return { r: r, g: g, b: b };
   }
 
-  /* ── PREVIEW image loader ────────────────────────────────
-     Plain Image — loads fast from browser cache, no CORS needed.
-     The live preview canvas may become "tainted" but we NEVER call
-     toBlob() on it, so the taint is harmless.                   */
+  /* ── Image loader (shared by preview + export) ───────────
+     Netlify static assets are always same-origin. Same-origin
+     images loaded with new Image() NEVER taint the canvas — so
+     canvas.toBlob() always works. No fetch, no blob URLs, no CORS
+     gymnastics needed. Just a plain cached image load.
+     encodeURI handles spaces: "Castle 1_1.png" → "Castle%201_1.png" */
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
     return new Promise(function (res) {
       var img = new Image();
       img.onload  = function () { _imgCache[src] = img; res(img); };
-      img.onerror = function () { res(null); };
-      img.src = encodeURI(src);   // encodeURI: "Castle 1_1.png" → "Castle%201_1.png"
+      img.onerror = function () {
+        console.warn('[CANVAS] image load failed:', src);
+        res(null);
+      };
+      img.src = encodeURI(src);
     });
   }
 
-  /* ── EXPORT image loader ─────────────────────────────────
-     fetch → Blob → createObjectURL → Image.
-     A blob: URL is always same-origin (blob:https://wantedposts.netlify.app/...)
-     so any canvas drawn with it is NEVER tainted — canvas.toBlob()
-     ALWAYS works, regardless of CORS headers on the origin server.
+  /* loadImgForExport is the same as loadImg — kept as alias so
+     export.js doesn't need changes (forExport flag selects it). */
+  var loadImgForExport = loadImg;
 
-     cache:'reload' bypasses the browser HTTP cache so we always get a
-     fresh response (avoids stale no-CORS cached entries from the
-     preview loader which uses plain <img> without crossOrigin).
-
-     We keep the blob URL alive (_exportBlobUrls) because revoking it
-     immediately after onload can cause Chrome to discard the decoded
-     pixel data before drawImage() runs (blank canvas).            */
-  function loadImgForExport(src) {
-    if (!src) return Promise.resolve(null);
-    if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
-    return new Promise(function (res) {
-      fetch(encodeURI(src), { cache: 'reload' })
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + src);
-          return r.blob();
-        })
-        .then(function (blob) {
-          var blobUrl = URL.createObjectURL(blob);
-          _exportBlobUrls[src] = blobUrl; // keep alive — do NOT revoke
-          var img = new Image();
-          img.onload  = function () { _exportImgCache[src] = img; res(img); };
-          img.onerror = function () {
-            console.warn('[CANVAS] blob URL decode failed for', src);
-            res(null);
-          };
-          img.src = blobUrl;
-        })
-        .catch(function (err) {
-          console.warn('[CANVAS] export fetch failed for', src, err);
-          res(null);
-        });
-    });
-  }
-
-  /* ── Pre-warm export image cache ─────────────────────────
-     Call this when a brand / image is selected so that by the
-     time the user clicks Generate, all images are already in
-     _exportImgCache and rendering is instant.                */
+  /* ── Pre-warm image cache ────────────────────────────────
+     Called on brand/image select so images are already loaded
+     by the time the user clicks Generate.                    */
   function prewarmExportImages(state) {
     if (!state || !state.brand) return;
     var brand = BRANDS[state.brand];
-    if (brand && brand.logo) loadImgForExport(brand.logo);
+    if (brand && brand.logo) loadImg(brand.logo);
     if (!state.image) return;
-    if (state.image.file11)  loadImgForExport(state.image.file11);
-    if (state.image.file916) loadImgForExport(state.image.file916);
+    if (state.image.file11)  loadImg(state.image.file11);
+    if (state.image.file916) loadImg(state.image.file916);
   }
 
   /* ── Background (cover-fit) ────────────────────────────── */
@@ -293,31 +259,36 @@ const CANVAS = (function () {
   }
 
   /* ── Headline auto-fit ─────────────────────────────────── */
-  // Tries up to 3 lines; steps down to 20 px minimum.
-  // Long position titles (e.g. "App Creator Community Manager")
-  // will wrap to 3 lines at a readable size rather than overflowing.
+  // Tries 2 lines first, then 3 lines, stepping font size down from
+  // startSz to MIN_SZ.  Checks BOTH vertical height and that every
+  // individual line fits within maxW — without this check, wrapText
+  // stuffs all overflow words into the last line, which then renders
+  // wider than the canvas and appears cropped.
   function fitFont(ctx, text, maxW, maxH, startSz, font) {
-    var sz = startSz;
-    var lines;
-    // First pass: try 2 lines
-    while (sz >= 20) {
-      ctx.font = '800 ' + sz + 'px ' + font;
-      lines = wrapText(ctx, text, maxW, 2);
-      if (lines.length <= 2 && lines.length * sz * 1.25 <= maxH) return { sz: sz, lines: lines };
-      sz -= 4;
+    var MIN_SZ = 20;
+    function allLinesFit(lines, sz) {
+      if (lines.length * sz * 1.25 > maxH) return false;
+      for (var i = 0; i < lines.length; i++) {
+        if (ctx.measureText(lines[i]).width > maxW) return false;
+      }
+      return true;
     }
-    // Second pass: allow 3 lines, try from original startSz again
-    sz = startSz;
-    while (sz >= 20) {
-      ctx.font = '800 ' + sz + 'px ' + font;
-      lines = wrapText(ctx, text, maxW, 3);
-      if (lines.length <= 3 && lines.length * sz * 1.25 <= maxH) return { sz: sz, lines: lines };
-      sz -= 4;
+    var sz, lines;
+    for (var maxL = 2; maxL <= 3; maxL++) {
+      sz = startSz;
+      while (sz >= MIN_SZ) {
+        ctx.font = '800 ' + sz + 'px ' + font;
+        lines = wrapText(ctx, text, maxW, maxL);
+        if (lines.length <= maxL && allLinesFit(lines, sz)) {
+          return { sz: sz, lines: lines };
+        }
+        sz -= 2;  // smaller step for smoother fit
+      }
     }
-    // Absolute fallback
-    ctx.font = '800 20px ' + font;
+    // Absolute fallback — 3 lines at minimum size
+    ctx.font = '800 ' + MIN_SZ + 'px ' + font;
     lines = wrapText(ctx, text, maxW, 3);
-    return { sz: 20, lines: lines };
+    return { sz: MIN_SZ, lines: lines };
   }
 
   /* ── Text + CTA rendering ──────────────────────────────── */
@@ -420,7 +391,12 @@ const CANVAS = (function () {
         ctx.shadowBlur   = 6;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
         var subX = cz.al === 'center' ? (cz.x + cz.w / 2) : cz.x;
-        var subY = by + btnH + (is916 ? 20 : 14);
+        // Gap below button = same visual weight as the gap above button from title zone bottom.
+        // Title zone bottom → button top is (cz.y + (cz.h-btnH)/2) - titBot,
+        // which works out to roughly btnH/2 worth of zone padding.
+        // Matching that: gap = half the button height keeps it balanced.
+        var subGap = Math.round(btnH * 0.45);
+        var subY = by + btnH + subGap;
         ctx.fillText(subLabel.toUpperCase(), subX, subY);
         ctx.restore();
       }
@@ -525,17 +501,10 @@ const CANVAS = (function () {
     _c916.width = S916.w;  _c916.height = S916.h;
   }
 
-  /* ── Invalidate seed + image caches ───────────────────── */
+  /* ── Invalidate seed + image cache ────────────────────── */
   function resetSeeds() {
     _seeds = null; _seedKey = '';
-    // Clear preview cache
     Object.keys(_imgCache).forEach(function (k) { delete _imgCache[k]; });
-    // Revoke export blob URLs and clear export caches
-    Object.keys(_exportBlobUrls).forEach(function (k) {
-      URL.revokeObjectURL(_exportBlobUrls[k]);
-      delete _exportBlobUrls[k];
-    });
-    Object.keys(_exportImgCache).forEach(function (k) { delete _exportImgCache[k]; });
   }
 
   return {
