@@ -438,6 +438,9 @@
     elProgressWrap.style.display = 'flex';
     elSuccessState.style.display = 'none';
 
+    var filenameEl = document.getElementById('filename-input');
+    var filename   = filenameEl ? filenameEl.value : 'recruitment-banners';
+
     EXPORT.generatePackage(
       state,
       function (pct, label) {
@@ -482,7 +485,8 @@
           elBtnExport.style.display    = '';
           elProgressLabel.style.color  = '';
         }, 4000);
-      }
+      },
+      filename
     );
   }
 

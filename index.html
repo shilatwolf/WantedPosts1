@@ -185,6 +185,11 @@
     <!-- Export area -->
     <div class="export-area" id="export-area">
 
+      <div class="filename-row">
+        <input type="text" id="filename-input" class="pos-input" value="recruitment-banners" placeholder="filename…" maxlength="80" autocomplete="off" spellcheck="false">
+        <span class="filename-ext">.zip</span>
+      </div>
+
       <button class="btn-p" id="btn-export" disabled>
         ↓ Generate Package
       </button>
@@ -218,10 +223,11 @@
 <!-- ── CDN libs ───────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="gif.worker.blob.js"></script>
 
 <!-- ── App scripts (order matters) ───────────────────────── -->
 <!-- IMAGES_DATA: auto-injected by generate-manifest.js - do not edit this block by hand -->
-<div id="images-data-block" style="display:none" aria-hidden="true">{"overwolf":[{"id":"ov-01","file":"assets/images/overwolf/1_1 Overwolf-1.png","label":"1:1 Overwolf 1","layouts":["left","right","center"]},{"id":"ov-02","file":"assets/images/overwolf/1_1 Overwolf.png","label":"1:1 Overwolf","layouts":["left","right","center"]},{"id":"ov-03","file":"assets/images/overwolf/9_16 Overwolf-1.png","label":"9:16 Overwolf 1","layouts":["left","right","center"]},{"id":"ov-04","file":"assets/images/overwolf/9_16 Overwolf.png","label":"9:16 Overwolf","layouts":["left","right","center"]}],"tebex":[],"outplayed":[]}</div>
+<div id="images-data-block" style="display:none" aria-hidden="true">{"overwolf":[{"id":"ov-01","label":"Castle","file11":"assets/images/overwolf/Castle 1_1.png","file916":"assets/images/overwolf/Castle 9_16.png","layouts":["left","center"]},{"id":"ov-02","label":"Keyboard","file11":"assets/images/overwolf/Keyboard 1_1.png","file916":"assets/images/overwolf/Keyboard 9_16.png","layouts":["left","center"]}],"tebex":[],"outplayed":[]}</div>
 <!-- END IMAGES_DATA -->
 <script src="brands.js"></script>
 <script src="canvas.js"></script>

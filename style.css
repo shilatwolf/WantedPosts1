@@ -621,6 +621,28 @@ body {
   border-radius:3px;
 }
 
+/* ── Filename row ────────────────────────────────────────── */
+.filename-row {
+  display:flex;
+  align-items:center;
+  gap:0;
+}
+.filename-row .pos-input {
+  flex:1;
+  border-right:none;
+}
+.filename-ext {
+  padding:var(--sp-300) var(--sp-400);
+  background:var(--s2);
+  border:1.5px solid var(--b3);
+  border-left:none;
+  font-family:var(--font-brand);
+  font-size:var(--fs-300);
+  color:var(--t3);
+  white-space:nowrap;
+  flex-shrink:0;
+}
+
 /* ── Export area ─────────────────────────────────────────── */
 .export-area {
   border-top:1px solid var(--b4);

@@ -1,0 +1,2 @@
+cd "C:\Users\user\OneDrive\Internal Tools\WantedPosts"
+node generate-manifest.js
