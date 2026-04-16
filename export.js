@@ -196,7 +196,7 @@ const EXPORT = (function () {
     URL.revokeObjectURL(url);
   }
 
-  /* ── ZIP via JSZip ───────────────────────────────────── */
+  /* ── ZIP via JSZip (fallback only) ───────────────────── */
   function makeZip(png11, gif11, png916, videoResult) {
     return new Promise(function (resolve, reject) {
       if (typeof JSZip === 'undefined') {
@@ -209,6 +209,35 @@ const EXPORT = (function () {
       zip.file('banner-9x16.png', png916);
       zip.file('banner-9x16.' + videoResult.ext, videoResult.blob);
       zip.generateAsync({ type: 'blob' }).then(resolve).catch(reject);
+    });
+  }
+
+  /* ── Save files via File System Access API ───────────
+     showDirectoryPicker: user picks a folder once, all 4 files
+     are written directly there.  Files saved this way are local
+     — no ZIP container, no Zone.Identifier / Mark-of-the-Web,
+     Windows Defender never flags them.
+  ──────────────────────────────────────────────────────── */
+  function saveToDirectory(png11, gif11, png916, videoResult) {
+    var files = [
+      { name: 'banner-1x1.png',                       blob: png11 },
+      { name: 'banner-1x1.gif',                       blob: gif11 },
+      { name: 'banner-9x16.png',                      blob: png916 },
+      { name: 'banner-9x16.' + videoResult.ext,       blob: videoResult.blob }
+    ];
+
+    return window.showDirectoryPicker({
+      id:       'banner-export',
+      startIn:  'downloads',
+      mode:     'readwrite'
+    }).then(function (dir) {
+      // Write files one by one
+      return files.reduce(function (chain, f) {
+        return chain
+          .then(function () { return dir.getFileHandle(f.name, { create: true }); })
+          .then(function (fh)  { return fh.createWritable(); })
+          .then(function (w)   { return w.write(f.blob).then(function () { return w.close(); }); });
+      }, Promise.resolve());
     });
   }
 
@@ -244,59 +273,99 @@ const EXPORT = (function () {
       })
       .then(function (result) {
         videoResult = result;
-        step(95, 'Packaging ZIP…');
-        return makeZip(png11, gif11, png916, videoResult);
-      })
-      .then(function (zipBlob) {
-        step(100, 'Done!');
-        var zipName = (filename && filename.trim()) ? filename.trim() + '.zip' : 'recruitment-banners.zip';
 
-        // Prefer File System Access API — files saved this way are NOT tagged with
-        // Zone.Identifier (no MOTW), so Windows SmartScreen never blocks them.
-        if (window.showSaveFilePicker) {
-          window.showSaveFilePicker({
-            suggestedName: zipName,
-            types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
-          }).then(function (handle) {
-            return handle.createWritable().then(function (writable) {
-              return writable.write(zipBlob).then(function () {
-                return writable.close();
+        // ── Strategy 1: showDirectoryPicker ────────────────
+        // Writes 4 files directly into a user-chosen folder.
+        // No ZIP → no Zone.Identifier → Windows never blocks them.
+        if (window.showDirectoryPicker) {
+          step(95, 'Choose a folder to save your 4 banner files…');
+          return saveToDirectory(png11, gif11, png916, videoResult)
+            .then(function () {
+              step(100, 'Done!');
+              if (onComplete) onComplete({
+                videoExt:   videoResult.ext,
+                png11Size:  (png11.size  / 1024).toFixed(0),
+                gif11Size:  (gif11.size  / 1024).toFixed(0),
+                png916Size: (png916.size / 1024).toFixed(0),
+                vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+                savedAs:    'folder'
               });
+            })
+            .catch(function (err) {
+              if (err && err.name === 'AbortError') {
+                // User cancelled the folder picker — restore UI so they can retry
+                step(0, '');
+                if (onError) onError('__cancelled__');
+                return;
+              }
+              throw err; // bubble to outer .catch
             });
-          }).then(function () {
-            if (onComplete) onComplete({
-              videoExt:   videoResult.ext,
-              png11Size:  (png11.size  / 1024).toFixed(0),
-              gif11Size:  (gif11.size  / 1024).toFixed(0),
-              png916Size: (png916.size / 1024).toFixed(0),
-              vidSize:    (videoResult.blob.size / 1024).toFixed(0)
-            });
-          }).catch(function (err) {
-            // User cancelled the picker — not an error worth surfacing
-            if (err && err.name === 'AbortError') return;
-            console.warn('[EXPORT] showSaveFilePicker failed, falling back', err);
-            _fallbackDownload(zipBlob, zipName);
-            if (onComplete) onComplete({
-              videoExt:   videoResult.ext,
-              png11Size:  (png11.size  / 1024).toFixed(0),
-              gif11Size:  (gif11.size  / 1024).toFixed(0),
-              png916Size: (png916.size / 1024).toFixed(0),
-              vidSize:    (videoResult.blob.size / 1024).toFixed(0)
-            });
-          });
-          return; // onComplete called inside the promise chain above
         }
 
-        // Fallback: classic <a> download (may trigger SmartScreen on Windows)
-        _fallbackDownload(zipBlob, zipName);
+        // ── Strategy 2: ZIP + showSaveFilePicker ───────────
+        // Safer than anchor download but still packaged as ZIP.
+        // showSaveFilePicker saves without Zone.Identifier; however,
+        // Windows may still flag files extracted from the ZIP.
+        step(95, 'Packaging ZIP…');
+        return makeZip(png11, gif11, png916, videoResult)
+          .then(function (zipBlob) {
+            var zipName = (filename && filename.trim())
+              ? filename.trim() + '.zip'
+              : 'recruitment-banners.zip';
 
-        if (onComplete) onComplete({
-          videoExt:   videoResult.ext,
-          png11Size:  (png11.size  / 1024).toFixed(0),
-          gif11Size:  (gif11.size  / 1024).toFixed(0),
-          png916Size: (png916.size / 1024).toFixed(0),
-          vidSize:    (videoResult.blob.size / 1024).toFixed(0)
-        });
+            if (window.showSaveFilePicker) {
+              return window.showSaveFilePicker({
+                suggestedName: zipName,
+                types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
+              })
+              .then(function (handle) {
+                return handle.createWritable()
+                  .then(function (w) { return w.write(zipBlob).then(function () { return w.close(); }); });
+              })
+              .then(function () {
+                step(100, 'Done!');
+                if (onComplete) onComplete({
+                  videoExt:   videoResult.ext,
+                  png11Size:  (png11.size  / 1024).toFixed(0),
+                  gif11Size:  (gif11.size  / 1024).toFixed(0),
+                  png916Size: (png916.size / 1024).toFixed(0),
+                  vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+                  savedAs:    'zip'
+                });
+              })
+              .catch(function (err) {
+                if (err && err.name === 'AbortError') {
+                  step(0, '');
+                  if (onError) onError('__cancelled__');
+                  return;
+                }
+                // Picker failed — anchor fallback
+                console.warn('[EXPORT] showSaveFilePicker failed, using anchor', err);
+                _fallbackDownload(zipBlob, zipName);
+                step(100, 'Done!');
+                if (onComplete) onComplete({
+                  videoExt:   videoResult.ext,
+                  png11Size:  (png11.size  / 1024).toFixed(0),
+                  gif11Size:  (gif11.size  / 1024).toFixed(0),
+                  png916Size: (png916.size / 1024).toFixed(0),
+                  vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+                  savedAs:    'zip'
+                });
+              });
+            }
+
+            // ── Strategy 3: plain anchor download ──────────
+            _fallbackDownload(zipBlob, zipName);
+            step(100, 'Done!');
+            if (onComplete) onComplete({
+              videoExt:   videoResult.ext,
+              png11Size:  (png11.size  / 1024).toFixed(0),
+              gif11Size:  (gif11.size  / 1024).toFixed(0),
+              png916Size: (png916.size / 1024).toFixed(0),
+              vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+              savedAs:    'zip'
+            });
+          });
       })
       .catch(function (err) {
         console.error('[EXPORT]', err);

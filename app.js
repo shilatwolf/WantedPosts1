@@ -450,11 +450,16 @@
       function (info) {
         elProgressWrap.style.display = 'none';
 
-        var vidLabel = info.videoExt === 'webm' ? 'WebM (rename to .mp4 if needed)' : 'MP4';
+        var folderSave = info.savedAs === 'folder';
+        var titleText  = folderSave ? 'Files saved to folder!' : 'Package downloaded!';
+        var noteText   = folderSave
+          ? '<p class="success-note" style="color:var(--tok)">✓ Saved directly — no ZIP, no security warnings.</p>'
+          : (info.videoExt === 'webm' ? '<p class="success-note">⚠ Video saved as .webm — rename to .mp4 if needed.</p>' : '');
+
         elSuccessState.innerHTML =
           '<div class="success-header">' +
             '<div class="success-icon">✓</div>' +
-            '<span class="success-title">Package downloaded!</span>' +
+            '<span class="success-title">' + titleText + '</span>' +
           '</div>' +
           '<div class="success-files">' +
             '<div class="success-file">banner-1x1.png <span>'  + info.png11Size  + ' KB</span></div>' +
@@ -463,7 +468,7 @@
             '<div class="success-file">banner-9x16.' + info.videoExt +
               ' <span class="' + (info.videoExt === 'webm' ? 'webm' : '') + '">' + info.vidSize + ' KB</span></div>' +
           '</div>' +
-          (info.videoExt === 'webm' ? '<p class="success-note">⚠ Video saved as .webm — rename to .mp4 if your platform requires it.</p>' : '') +
+          noteText +
           '<div class="action-bar" style="margin-top:12px">' +
             '<button class="btn-s" id="btn-restart" style="width:100%;justify-content:center">↩ Start Over</button>' +
           '</div>';
@@ -476,6 +481,12 @@
         if (restartBtn) restartBtn.addEventListener('click', onRestart);
       },
       function (errMsg) {
+        // '__cancelled__' means the user closed the folder/file picker — restore quietly
+        if (errMsg === '__cancelled__') {
+          elProgressWrap.style.display = 'none';
+          elBtnExport.style.display    = '';
+          return;
+        }
         elProgressWrap.style.display = 'none';
         elProgressLabel.textContent  = '✗ ' + errMsg;
         elProgressLabel.style.color  = 'var(--terr)';

@@ -40,31 +40,16 @@ const CANVAS = (function () {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
     return new Promise(function (res) {
-      // Strategy: fetch the image as a Blob, then create a local object URL.
-      // A canvas drawn with blob: URLs is never "tainted" — toBlob() always works.
-      // Falls back to img + crossOrigin for file:// (local preview).
-      // encodeURI handles spaces and special chars in filenames (e.g. "Castle 1_1.png").
-      fetch(encodeURI(src))
-        .then(function (r) { return r.blob(); })
-        .then(function (blob) {
-          var blobUrl = URL.createObjectURL(blob);
-          var img = new Image();
-          img.onload = function () {
-            _imgCache[src] = img;
-            URL.revokeObjectURL(blobUrl);
-            res(img);
-          };
-          img.onerror = function () { URL.revokeObjectURL(blobUrl); res(null); };
-          img.src = blobUrl;
-        })
-        .catch(function () {
-          // fetch failed (file:// local preview) — fall back to crossOrigin img
-          var img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload  = function () { _imgCache[src] = img; res(img); };
-          img.onerror = function () { res(null); };
-          img.src = src;
-        });
+      // All images are same-origin on Netlify, so a plain <img> load never taints
+      // the canvas and canvas.toBlob() always succeeds.  Using fetch+blob here was
+      // causing silent failures: the picker's <img> tags cache images without CORS
+      // headers, and the subsequent fetch (with different cache semantics) would
+      // sometimes miss or return a blob that decoded to null.
+      // encodeURI converts spaces in filenames ("Castle 1_1.png" → "Castle%201_1.png").
+      var img = new Image();
+      img.onload  = function () { _imgCache[src] = img; res(img); };
+      img.onerror = function () { res(null); };
+      img.src = encodeURI(src);
     });
   }
 
