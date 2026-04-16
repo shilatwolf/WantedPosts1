@@ -54,33 +54,55 @@ const CANVAS = (function () {
 
   /* ── EXPORT image loader ─────────────────────────────────
      fetch → Blob → createObjectURL → Image.
-     Blob-URL images are always same-origin so canvas.toBlob()
-     NEVER throws "Tainted canvases may not be exported",
-     regardless of whether the original URL is cross-origin CDN.
-     We keep the blob URL alive (no revoke) so drawImage()
-     always has valid pixel data to work with.                  */
+     A blob: URL is always same-origin (blob:https://wantedposts.netlify.app/...)
+     so any canvas drawn with it is NEVER tainted — canvas.toBlob()
+     ALWAYS works, regardless of CORS headers on the origin server.
+
+     cache:'reload' bypasses the browser HTTP cache so we always get a
+     fresh response (avoids stale no-CORS cached entries from the
+     preview loader which uses plain <img> without crossOrigin).
+
+     We keep the blob URL alive (_exportBlobUrls) because revoking it
+     immediately after onload can cause Chrome to discard the decoded
+     pixel data before drawImage() runs (blank canvas).            */
   function loadImgForExport(src) {
     if (!src) return Promise.resolve(null);
     if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
     return new Promise(function (res) {
-      fetch(encodeURI(src))
+      fetch(encodeURI(src), { cache: 'reload' })
         .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
+          if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + src);
           return r.blob();
         })
         .then(function (blob) {
           var blobUrl = URL.createObjectURL(blob);
-          _exportBlobUrls[src] = blobUrl;   // keep alive — do NOT revoke
+          _exportBlobUrls[src] = blobUrl; // keep alive — do NOT revoke
           var img = new Image();
           img.onload  = function () { _exportImgCache[src] = img; res(img); };
-          img.onerror = function () { res(null); };
+          img.onerror = function () {
+            console.warn('[CANVAS] blob URL decode failed for', src);
+            res(null);
+          };
           img.src = blobUrl;
         })
         .catch(function (err) {
-          console.warn('[CANVAS] export image load failed:', src, err);
+          console.warn('[CANVAS] export fetch failed for', src, err);
           res(null);
         });
     });
+  }
+
+  /* ── Pre-warm export image cache ─────────────────────────
+     Call this when a brand / image is selected so that by the
+     time the user clicks Generate, all images are already in
+     _exportImgCache and rendering is instant.                */
+  function prewarmExportImages(state) {
+    if (!state || !state.brand) return;
+    var brand = BRANDS[state.brand];
+    if (brand && brand.logo) loadImgForExport(brand.logo);
+    if (!state.image) return;
+    if (state.image.file11)  loadImgForExport(state.image.file11);
+    if (state.image.file916) loadImgForExport(state.image.file916);
   }
 
   /* ── Background (cover-fit) ────────────────────────────── */
@@ -140,13 +162,17 @@ const CANVAS = (function () {
   }
 
   /* ── Smoke & ember rendering ───────────────────────────── */
-  function drawSmoke(ctx, w, h, seeds, frame, emberColor) {
+  // t = elapsed time in SECONDS — frame-rate independent.
+  // At 15 fps: t = frame/15.  At 30 fps: t = frame/30.
+  // Drift speed ~15 px/s; flicker ~0.9 Hz (gentle, ambient).
+  function drawSmoke(ctx, w, h, seeds, t, emberColor) {
     ctx.save();
-    var fr = frame || 0;
+    t = t || 0;
+    var DRIFT = 15; // px per second of drift
 
     // ── Smoke wisps (dark, always) ──────────────────────
     seeds.wisps.forEach(function (ws) {
-      var drift = fr * ws.spd;
+      var drift = t * ws.spd * DRIFT;
       var y = ((ws.y - drift) % (h + ws.rad * 2) + h + ws.rad * 2) % (h + ws.rad * 2) - ws.rad;
       var g = ctx.createRadialGradient(ws.x, y, 0, ws.x, y, ws.rad);
       g.addColorStop(0,   'rgba(18,18,18,' + (ws.op * 3.0).toFixed(4) + ')');
@@ -162,10 +188,10 @@ const CANVAS = (function () {
     if (emberColor) {
       var rgb = hexToRGB(emberColor);
       seeds.dots.forEach(function (d) {
-        var drift = fr * d.spd;
+        var drift = t * d.spd * DRIFT;
         var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
-        // Flicker: each ember has its own phase offset
-        var flicker = 0.55 + 0.45 * Math.sin(fr * 0.65 + d.flickerPhase);
+        // Flicker at ~0.9 Hz — ambient, not flashy. Frame-rate independent.
+        var flicker = 0.55 + 0.45 * Math.sin(t * Math.PI * 2 * 0.9 + d.flickerPhase);
         var alpha   = Math.min(1, d.op * flicker);
 
         // Core dot
@@ -189,7 +215,7 @@ const CANVAS = (function () {
     } else {
       // Tebex: very subtle neutral dust only
       seeds.dots.forEach(function (d) {
-        var drift = fr * d.spd;
+        var drift = t * d.spd * DRIFT;
         var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
         ctx.beginPath();
         ctx.arc(d.x, y, d.r * 0.6, 0, Math.PI * 2);
@@ -267,22 +293,36 @@ const CANVAS = (function () {
   }
 
   /* ── Headline auto-fit ─────────────────────────────────── */
+  // Tries up to 3 lines; steps down to 20 px minimum.
+  // Long position titles (e.g. "App Creator Community Manager")
+  // will wrap to 3 lines at a readable size rather than overflowing.
   function fitFont(ctx, text, maxW, maxH, startSz, font) {
     var sz = startSz;
     var lines;
-    while (sz >= 24) {
+    // First pass: try 2 lines
+    while (sz >= 20) {
       ctx.font = '800 ' + sz + 'px ' + font;
       lines = wrapText(ctx, text, maxW, 2);
-      if (lines.length <= 2 && lines.length * sz * 1.25 <= maxH) break;
+      if (lines.length <= 2 && lines.length * sz * 1.25 <= maxH) return { sz: sz, lines: lines };
       sz -= 4;
     }
-    return { sz: sz, lines: lines };
+    // Second pass: allow 3 lines, try from original startSz again
+    sz = startSz;
+    while (sz >= 20) {
+      ctx.font = '800 ' + sz + 'px ' + font;
+      lines = wrapText(ctx, text, maxW, 3);
+      if (lines.length <= 3 && lines.length * sz * 1.25 <= maxH) return { sz: sz, lines: lines };
+      sz -= 4;
+    }
+    // Absolute fallback
+    ctx.font = '800 20px ' + font;
+    lines = wrapText(ctx, text, maxW, 3);
+    return { sz: 20, lines: lines };
   }
 
   /* ── Text + CTA rendering ──────────────────────────────── */
-  function drawText(ctx, zones, brand, msg, cta, is916, fstate) {
+  function drawText(ctx, zones, brand, msg, cta, subLabel, is916, fstate) {
     var BF = "'Montserrat', sans-serif";
-    var LF = "'Lato', sans-serif";
     var msgOpacity = (fstate && fstate.msgOpacity !== undefined) ? fstate.msgOpacity : 1;
     var ctaPulse   = (fstate && fstate.ctaPulse   !== undefined) ? fstate.ctaPulse   : 0;
 
@@ -319,12 +359,13 @@ const CANVAS = (function () {
 
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
-      var ctaFontSz = is916 ? 42 : 36;   // 1:1 bumped 32→36 for better presence
+      var ctaText  = cta.toUpperCase();               // always CAPS
+      var ctaFontSz = is916 ? 42 : 36;
       ctx.save();
-      ctx.font = '700 ' + ctaFontSz + 'px ' + LF;
-      var txtW  = ctx.measureText(cta).width;
-      var padH  = is916 ? 36 : 34;       // slightly wider padding for 1:1
-      var padV  = is916 ? 22 : 20;       // slightly taller padding for 1:1
+      ctx.font = '700 ' + ctaFontSz + 'px ' + BF;   // Montserrat, not Lato
+      var txtW  = ctx.measureText(ctaText).width;
+      var padH  = is916 ? 36 : 34;
+      var padV  = is916 ? 22 : 20;
       var btnW  = Math.min(cz.w, txtW + padH * 2);
       var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
@@ -338,10 +379,10 @@ const CANVAS = (function () {
       ctx.translate(bx + btnW / 2, by + btnH / 2);
       ctx.scale(scale, scale);
 
-      // Glow layer (prominent when ctaPulse > 0.2)
+      // Glow layer
       if (ctaPulse > 0.15) {
-        var glowSize = ctaPulse * 28;
-        var rgb      = hexToRGB(brand.accent);
+        var glowSize  = ctaPulse * 28;
+        var rgb       = hexToRGB(brand.accent);
         var glowAlpha = ctaPulse * 0.55;
         var g = ctx.createRadialGradient(0, 0, 0, 0, 0, btnW * 0.8);
         g.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + glowAlpha.toFixed(3) + ')');
@@ -357,15 +398,32 @@ const CANVAS = (function () {
       ctx.fillStyle = brand.accent;
       ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
 
-      // Button text
+      // Button text — Montserrat Bold CAPS
       ctx.fillStyle    = brand.ctaTextColor;
-      ctx.font         = '700 ' + ctaFontSz + 'px ' + LF;
+      ctx.font         = '700 ' + ctaFontSz + 'px ' + BF;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor  = 'rgba(0,0,0,0)';
       ctx.shadowBlur   = 0;
-      ctx.fillText(cta, 0, 0);
+      ctx.fillText(ctaText, 0, 0);
       ctx.restore();
+
+      // ── Sub-label below button (optional) ─────────────
+      if (subLabel && subLabel.trim()) {
+        var subFontSz = is916 ? 22 : 17;
+        ctx.save();
+        ctx.font         = '300 ' + subFontSz + 'px ' + BF;  // Montserrat Light
+        ctx.fillStyle    = 'rgba(255,255,255,0.65)';
+        ctx.textAlign    = cz.al === 'center' ? 'center' : 'left';
+        ctx.textBaseline = 'top';
+        ctx.shadowColor  = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur   = 6;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
+        var subX = cz.al === 'center' ? (cz.x + cz.w / 2) : cz.x;
+        var subY = by + btnH + (is916 ? 20 : 14);
+        ctx.fillText(subLabel.toUpperCase(), subX, subY);
+        ctx.restore();
+      }
     }
   }
 
@@ -394,10 +452,11 @@ const CANVAS = (function () {
     var w = spec.w, h = spec.h;
     var loader = forExport ? loadImgForExport : loadImg;
 
-    var brand = BRANDS[state.brand];
-    var lay   = state.layout || 'left';
-    var msg   = state.messageMode === 'preset' ? state.messagePreset : state.messagePosition;
-    var cta   = state.cta;
+    var brand    = BRANDS[state.brand];
+    var lay      = 'left';   // layout step removed — always left-aligned
+    var msg      = state.messageMode === 'preset' ? state.messagePreset : state.messagePosition;
+    var cta      = state.cta;
+    var subLabel = state.subLabel || '';
 
     // Use the correct format image for each output size
     var imgSrc = is916
@@ -423,11 +482,14 @@ const CANVAS = (function () {
     var seeds = is916 ? _seeds.s916 : _seeds.s11;
     var zones = is916 ? getZones916(lay) : getZones11(lay);
 
+    // Convert frame → seconds so drawSmoke is frame-rate independent.
+    // fstate.t is set by export.js (f/15 for GIF, frame/fps for video).
+    // Preview renders at frame=0, t=0 (static snapshot is fine).
+    var t = (fstate && fstate.t !== undefined) ? fstate.t : (frame || 0) / 15;
+
     drawBg(ctx, bgImg, w, h);
-    drawSmoke(ctx, w, h, seeds, frame || 0, brand.emberColor || null);
-    // Render text as soon as we have a message — the CTA button is omitted until
-    // cta is also chosen, so the preview builds up progressively step by step.
-    if (msg) drawText(ctx, zones, brand, msg, cta || '', is916, fstate || {});
+    drawSmoke(ctx, w, h, seeds, t, brand.emberColor || null);
+    if (msg) drawText(ctx, zones, brand, msg, cta || '', subLabel, is916, fstate || {});
     drawLogo(ctx, logoImg, zones.logo);
   }
 
@@ -477,14 +539,15 @@ const CANVAS = (function () {
   }
 
   return {
-    init:        init,
-    render:      render,
-    renderToCtx: renderToCtx,
-    resetSeeds:  resetSeeds,
-    getC11:      function () { return _c11; },
-    getC916:     function () { return _c916; },
-    S11:         S11,
-    S916:        S916
+    init:                 init,
+    render:               render,
+    renderToCtx:          renderToCtx,
+    resetSeeds:           resetSeeds,
+    prewarmExportImages:  prewarmExportImages,
+    getC11:               function () { return _c11; },
+    getC916:              function () { return _c916; },
+    S11:                  S11,
+    S916:                 S916
   };
 
 })();

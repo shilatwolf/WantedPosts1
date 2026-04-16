@@ -13,13 +13,9 @@ const EXPORT = (function () {
   // F 0-9  : headline fades in fast
   // All:    embers drift up, CTA pulses continuously
   function gifFrameState(f) {
-    // msgOpacity is always 1 — a fade-in would cause a hard jump when the GIF
-    // loops back to frame 0 (text would instantly vanish), breaking the loop.
     var msgOpacity = 1;
-    // CTA pulse: period = 15 frames, 45 frames total = exactly 3 full cycles.
-    // Frame 0 and frame 45 have the same phase (0), so the loop is seamless.
     var ctaPulse = (Math.sin(f * (Math.PI * 2 / 15)) * 0.5 + 0.5);
-    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse };
+    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse, t: f / 15 };
   }
 
   /* ── MP4 frame state ─────────────────────────────────── */
@@ -31,7 +27,7 @@ const EXPORT = (function () {
                      1;
     // Continuous pulse matching GIF rhythm
     var ctaPulse = (Math.sin(t * Math.PI * 2 / 1.0) * 0.5 + 0.5);
-    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse };
+    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse, t: t };
   }
 
   /* ── PNG: capture single canvas frame ───────────────── */

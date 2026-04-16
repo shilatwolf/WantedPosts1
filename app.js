@@ -10,30 +10,42 @@
   var state = {
     brand:           null,   // 'overwolf' | 'tebex' | 'outplayed'
     image:           null,   // image object from manifest
-    layout:          null,   // 'left' | 'center'
-    messageMode:     'position',  // default to position (specific is preferred)
+    layout:          'left', // always left — layout step removed
+    messageMode:     'position',
     messagePreset:   null,
     messagePosition: '',
     cta:             null,
+    subLabel:        '',     // optional note below CTA button
     // internal
     images:          {}
   };
 
+  var SUBLABEL_OPTIONS = [
+    'UK Based *',
+    'US Based *',
+    'Remote *',
+    'Hybrid *',
+    'Part Time *',
+    'Maternity Leave Cover *'
+  ];
+
   /* ── DOM refs ───────────────────────────────────────────── */
   var $ = function (id) { return document.getElementById(id); };
 
-  var elSteps      = [null, $('step-1'), $('step-2'), $('step-3'), $('step-4'), $('step-5')];
+  var elSteps      = [null, $('step-1'), $('step-2'), $('step-3'), $('step-4')];
   var elSiItems    = document.querySelectorAll('.si-item');
   var elSiLines    = document.querySelectorAll('.si-line');
 
   var elBrandGrid  = $('brand-grid');
   var elImageGrid  = $('image-grid');
-  var elLayoutPills= $('layout-pills');
   var elPresetGrid = $('preset-grid');
   var elPosInput   = $('pos-input');
   var elPresetMode = $('preset-mode');
   var elPosMode    = $('pos-mode');
   var elCtaGrid    = $('cta-grid');
+  var elSubChips   = $('sublabel-chips');
+  var elSubOtherWrap  = $('sublabel-other-wrap');
+  var elSubOtherInput = $('sublabel-other-input');
 
   var elBtnExport  = $('btn-export');
   var elProgressWrap  = $('progress-wrap');
@@ -58,17 +70,16 @@
   function isComplete(n) {
     if (n === 1) return !!state.brand;
     if (n === 2) return !!state.image;
-    if (n === 3) return !!state.layout;
-    if (n === 4) {
+    if (n === 3) {
       if (state.messageMode === 'preset') return !!state.messagePreset;
       return state.messagePosition.trim().length > 0;
     }
-    if (n === 5) return !!state.cta;
+    if (n === 4) return !!state.cta;
     return false;
   }
 
   function allComplete() {
-    return isComplete(1) && isComplete(2) && isComplete(3) && isComplete(4) && isComplete(5);
+    return isComplete(1) && isComplete(2) && isComplete(3) && isComplete(4);
   }
 
   /* ── Update step indicator ────────────────────────────── */
@@ -95,18 +106,17 @@
   function stepSummary(n) {
     if (n === 1) return state.brand ? BRANDS[state.brand].name : '';
     if (n === 2) return state.image ? state.image.label : '';
-    if (n === 3) return state.layout ? (state.layout.charAt(0).toUpperCase() + state.layout.slice(1) + '-aligned') : '';
-    if (n === 4) {
+    if (n === 3) {
       if (state.messageMode === 'preset') return state.messagePreset || '';
       return state.messagePosition.trim() ? ('"' + state.messagePosition.trim() + '"') : '';
     }
-    if (n === 5) return state.cta || '';
+    if (n === 4) return state.cta || '';
     return '';
   }
 
   /* ── Render all wizard steps ──────────────────────────── */
   function renderWizard() {
-    for (var n = 1; n <= 5; n++) {
+    for (var n = 1; n <= 4; n++) {
       var el = elSteps[n];
       if (!el) continue;
 
@@ -127,7 +137,7 @@
 
   /* ── Open / collapse a step ───────────────────────────── */
   function openStep(n) {
-    for (var i = 1; i <= 5; i++) {
+    for (var i = 1; i <= 4; i++) {
       if (!elSteps[i]) continue;
       if (i === n && !elSteps[i].classList.contains('locked')) {
         elSteps[i].classList.add('active');
@@ -139,7 +149,7 @@
 
   /* ── Advance to next uncompleted step ─────────────────── */
   function advance() {
-    for (var n = 1; n <= 5; n++) {
+    for (var n = 1; n <= 4; n++) {
       if (!isComplete(n)) {
         openStep(n);
         if (elSteps[n]) {
@@ -184,22 +194,24 @@
     if (state.brand === key) return;
     state.brand           = key;
     state.image           = null;
-    state.layout          = null;
+    state.layout          = 'left';
     state.messagePreset   = null;
     state.messagePosition = '';
     state.cta             = null;
+    state.subLabel        = '';
     CANVAS.resetSeeds();
 
     setAccent(key);
     syncBrandGrid();
     buildImageGrid();
-    clearLayoutPills();
     clearPreset();
     clearCTA();
+    clearSubLabel();
 
     renderWizard();
     advance();
     scheduleRender();
+    CANVAS.prewarmExportImages(state);
   }
 
   function syncBrandGrid() {
@@ -255,13 +267,13 @@
 
   function onImageSelect(img) {
     state.image  = img;
-    state.layout = null;
+    state.layout = 'left';
     CANVAS.resetSeeds();
     syncImageGrid();
-    buildLayoutPills(img.layouts || []);
     renderWizard();
     // No advance() — let the user browse images freely before moving on.
     scheduleRender();
+    CANVAS.prewarmExportImages(state);
   }
 
   function syncImageGrid() {
@@ -271,51 +283,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     STEP 3 — Layout selection (left + center only)
-  ══════════════════════════════════════════════════════════ */
-  var LAYOUT_DEFS = {
-    left:   { label: 'Left-Aligned',  diag: 'l' },
-    center: { label: 'Centered',      diag: 'c' }
-  };
-
-  function buildLayoutPills(allowed) {
-    elLayoutPills.innerHTML = '';
-    Object.keys(LAYOUT_DEFS).forEach(function (key) {
-      var def  = LAYOUT_DEFS[key];
-      var pill = document.createElement('div');
-      pill.className = 'layout-pill' + (allowed.indexOf(key) === -1 ? ' disabled' : '');
-      pill.dataset.layout = key;
-
-      var d = def.diag;
-      pill.innerHTML =
-        '<div class="layout-diagram">' +
-          '<div class="ld-img"></div>' +
-          '<div class="ld-text-' + d + '"></div>' +
-          '<div class="ld-cta ld-cta-' + d + '"></div>' +
-        '</div>' +
-        '<span class="layout-label">' + def.label + '</span>';
-
-      pill.addEventListener('click', function () { onLayoutSelect(key); });
-      elLayoutPills.appendChild(pill);
-    });
-  }
-
-  function clearLayoutPills() {
-    elLayoutPills.innerHTML = '';
-  }
-
-  function onLayoutSelect(key) {
-    state.layout = key;
-    elLayoutPills.querySelectorAll('.layout-pill').forEach(function (el) {
-      el.classList.toggle('selected', el.dataset.layout === key);
-    });
-    renderWizard();
-    // No advance() — let the user stay on this step.
-    scheduleRender();
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     STEP 4 — Message
+     STEP 3 — Message
   ══════════════════════════════════════════════════════════ */
   function buildPresetGrid() {
     PRESET_COPY.forEach(function (text) {
@@ -365,7 +333,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     STEP 5 — Action text
+     STEP 4 — Action text + optional sub-label
   ══════════════════════════════════════════════════════════ */
   function buildCTAGrid() {
     CTA_OPTIONS.forEach(function (text) {
@@ -394,11 +362,70 @@
     scheduleRender();
   }
 
+  /* ── Sub-label (optional note below CTA button) ───────── */
+  function buildSubLabelChips() {
+    SUBLABEL_OPTIONS.forEach(function (text) {
+      var chip = document.createElement('div');
+      chip.className = 'sublabel-chip';
+      chip.dataset.value = text;
+      chip.textContent = text;
+      chip.addEventListener('click', function () { onSubLabelSelect(text); });
+      elSubChips.appendChild(chip);
+    });
+    // "Other" chip
+    var other = document.createElement('div');
+    other.className = 'sublabel-chip';
+    other.dataset.value = '__other__';
+    other.textContent = 'Other…';
+    other.addEventListener('click', function () { onSubLabelSelect('__other__'); });
+    elSubChips.appendChild(other);
+  }
+
+  function onSubLabelSelect(value) {
+    if (value === '__other__') {
+      // Show text input, clear preset selection
+      elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.value === '__other__');
+      });
+      elSubOtherWrap.style.display = '';
+      elSubOtherInput.focus();
+      state.subLabel = elSubOtherInput ? elSubOtherInput.value : '';
+      scheduleRender();
+      return;
+    }
+    // Toggle off if already selected
+    if (state.subLabel === value) {
+      state.subLabel = '';
+      elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
+        el.classList.remove('selected');
+      });
+      elSubOtherWrap.style.display = 'none';
+      scheduleRender();
+      return;
+    }
+    state.subLabel = value;
+    elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
+      el.classList.toggle('selected', el.dataset.value === value);
+    });
+    elSubOtherWrap.style.display = 'none';
+    if (elSubOtherInput) elSubOtherInput.value = '';
+    scheduleRender();
+  }
+
+  function clearSubLabel() {
+    state.subLabel = '';
+    if (elSubChips) elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
+      el.classList.remove('selected');
+    });
+    if (elSubOtherWrap) elSubOtherWrap.style.display = 'none';
+    if (elSubOtherInput) elSubOtherInput.value = '';
+  }
+
   /* ═══════════════════════════════════════════════════════
      STEP HEADER clicks
   ══════════════════════════════════════════════════════════ */
   function wireStepHeaders() {
-    for (var n = 1; n <= 5; n++) {
+    for (var n = 1; n <= 4; n++) {
       (function (num) {
         var hd = elSteps[num] && elSteps[num].querySelector('.step-hd');
         if (!hd) return;
@@ -533,19 +560,20 @@
   function onRestart() {
     state.brand           = null;
     state.image           = null;
-    state.layout          = null;
+    state.layout          = 'left';
     state.messageMode     = 'position';
     state.messagePreset   = null;
     state.messagePosition = '';
     state.cta             = null;
+    state.subLabel        = '';
     CANVAS.resetSeeds();
     setAccent(null);
 
     syncBrandGrid();
     buildImageGrid();
-    clearLayoutPills();
     clearPreset();
     clearCTA();
+    clearSubLabel();
 
     // Reset mode toggle UI — position is default
     document.querySelectorAll('.radio-btn').forEach(function (el) {
@@ -581,6 +609,7 @@
     buildBrandGrid();
     buildPresetGrid();
     buildCTAGrid();
+    buildSubLabelChips();
 
     // Mode toggle buttons
     document.querySelectorAll('.radio-btn').forEach(function (el) {
@@ -592,6 +621,14 @@
       elPosInput.addEventListener('input', function () {
         state.messagePosition = elPosInput.value;
         renderWizard();
+        scheduleRender();
+      });
+    }
+
+    // Sub-label other input
+    if (elSubOtherInput) {
+      elSubOtherInput.addEventListener('input', function () {
+        state.subLabel = elSubOtherInput.value;
         scheduleRender();
       });
     }

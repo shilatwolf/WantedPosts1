@@ -5,6 +5,6 @@
 # "Tainted canvases may not be exported" — required when crossOrigin='anonymous'
 # is set on images drawn to an HTML Canvas.
 [[headers]]
-  for = "/assets/*"
+  for = "/assets/**"
   [headers.values]
     Access-Control-Allow-Origin = "*"

@@ -505,6 +505,41 @@ body {
 .cta-chip:hover { border-color:var(--b2); color:var(--tp); }
 .cta-chip.selected { border-color:var(--accent); color:var(--accent); background:var(--s2); }
 
+/* ── Sub-label section ───────────────────────────────────── */
+.sublabel-section {
+  margin-top:var(--sp-600);
+  padding-top:var(--sp-400);
+  border-top:1px solid var(--s2);
+}
+.sublabel-heading {
+  font-family:var(--font-brand);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--t3);
+  margin:0 0 var(--sp-300);
+}
+.sublabel-optional { font-weight:400; opacity:.6; text-transform:none; letter-spacing:0; }
+.sublabel-chips { display:flex; flex-wrap:wrap; gap:var(--sp-200); margin-bottom:var(--sp-300); }
+.sublabel-chip {
+  padding:6px 14px;
+  border:1.5px solid var(--b3);
+  border-radius:0;
+  background:transparent;
+  cursor:pointer;
+  font-family:var(--font-brand);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.06em;
+  color:var(--t2);
+  transition:border-color .15s, color .15s, background .15s;
+  user-select:none;
+}
+.sublabel-chip:hover { border-color:var(--b2); color:var(--tp); }
+.sublabel-chip.selected { border-color:var(--accent); color:var(--accent); background:var(--s2); }
+.sublabel-other-wrap { margin-top:var(--sp-200); }
+
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn-p {
   display:inline-flex;
