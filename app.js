@@ -210,8 +210,8 @@
 
     renderWizard();
     advance();
-    scheduleRender();
-    CANVAS.prewarmExportImages(state);
+    // Prewarm first (fetches SVG logo), then render so the logo is ready
+    CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
 
   function syncBrandGrid() {
@@ -271,9 +271,8 @@
     CANVAS.resetSeeds();
     syncImageGrid();
     renderWizard();
-    // No advance() — let the user browse images freely before moving on.
-    scheduleRender();
-    CANVAS.prewarmExportImages(state);
+    // Prewarm (fetches background image), then render
+    CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
 
   function syncImageGrid() {

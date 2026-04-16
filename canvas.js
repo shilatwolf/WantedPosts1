@@ -100,15 +100,19 @@ const CANVAS = (function () {
   var loadImgForExport = loadImg;
 
   /* ── Pre-warm image cache ────────────────────────────────
-     Called on brand/image select so images are already loaded
-     by the time the user clicks Generate.                    */
+     Returns a Promise that resolves once all images for the
+     current state are loaded.  Callers await this before
+     rendering so the first frame is never logo-less.        */
   function prewarmExportImages(state) {
-    if (!state || !state.brand) return;
+    if (!state || !state.brand) return Promise.resolve();
     var brand = BRANDS[state.brand];
-    if (brand && brand.logo) loadImg(brand.logo);
-    if (!state.image) return;
-    if (state.image.file11)  loadImg(state.image.file11);
-    if (state.image.file916) loadImg(state.image.file916);
+    var jobs  = [];
+    if (brand && brand.logo) jobs.push(loadImg(brand.logo));
+    if (state.image) {
+      if (state.image.file11)  jobs.push(loadImg(state.image.file11));
+      if (state.image.file916) jobs.push(loadImg(state.image.file916));
+    }
+    return Promise.all(jobs);
   }
 
   /* ── Background (cover-fit) ────────────────────────────── */
