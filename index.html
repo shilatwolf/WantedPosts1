@@ -177,8 +177,8 @@
     <div class="export-area" id="export-area">
 
       <div class="filename-row">
-        <input type="text" id="filename-input" class="pos-input" value="recruitment-banners" placeholder="filename…" maxlength="80" autocomplete="off" spellcheck="false">
-        <span class="filename-ext">.zip</span>
+        <input type="text" id="filename-input" class="pos-input" value="recruitment-banners" placeholder="Export package name…" maxlength="80" autocomplete="off" spellcheck="false">
+        <span class="filename-ext">Package name</span>
       </div>
 
       <button class="btn-p" id="btn-export" disabled>
@@ -195,8 +195,7 @@
       <div id="success-state" style="display:none"></div>
 
       <p style="font-size:11px;color:var(--t3);font-family:var(--font-brand);letter-spacing:.04em;line-height:1.6">
-        Downloads a ZIP with 4 files:<br>
-        1:1 PNG + GIF for LinkedIn · 9:16 PNG + video for Stories
+        Choose an export package name. The app saves files directly to a folder when available; otherwise it falls back to a ZIP archive.
       </p>
 
     </div>
@@ -214,12 +213,11 @@
 <!-- ── CDN libs ───────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js"></script>
 <script src="gif.worker.blob.js"></script>
 
 <!-- ── App scripts (order matters) ───────────────────────── -->
-<!-- IMAGES_DATA: auto-injected by generate-manifest.js - do not edit this block by hand -->
-<div id="images-data-block" style="display:none" aria-hidden="true">{"overwolf":[{"id":"ov-01","label":"Castle","file11":"assets/images/overwolf/Castle 1_1.png","file916":"assets/images/overwolf/Castle 9_16.png","layouts":["left","center"]},{"id":"ov-02","label":"Cogwheels","file11":"assets/images/overwolf/Cogwheels 1_1.png","file916":"assets/images/overwolf/Cogwheels  9_16.png","layouts":["left","center"]},{"id":"ov-03","label":"Cursor","file11":"assets/images/overwolf/Cursor 1_1.png","file916":"assets/images/overwolf/Cursor 9_16.png","layouts":["left","center"]},{"id":"ov-04","label":"Dice","file11":"assets/images/overwolf/Dice 1_1.png","file916":"assets/images/overwolf/Dice 9_16.png","layouts":["left","center"]},{"id":"ov-05","label":"Gate","file11":"assets/images/overwolf/Gate 1_1.png","file916":"assets/images/overwolf/Gate 9_16.png","layouts":["left","center"]},{"id":"ov-06","label":"Hammer","file11":"assets/images/overwolf/Hammer 1_1.png","file916":"assets/images/overwolf/Hammer 9_16.png","layouts":["left","center"]},{"id":"ov-07","label":"Hammer 2","file11":"assets/images/overwolf/Hammer 2 1_1.png","file916":"assets/images/overwolf/Hammer 2 9_16.png","layouts":["left","center"]},{"id":"ov-08","label":"Heart","file11":"assets/images/overwolf/Heart 1_1.png","file916":"assets/images/overwolf/Heart 9_16.png","layouts":["left","center"]},{"id":"ov-09","label":"Helmet","file11":"assets/images/overwolf/Helmet 1_1.png","file916":"assets/images/overwolf/Helmet 9_16.png","layouts":["left","center"]},{"id":"ov-10","label":"Horn","file11":"assets/images/overwolf/Horn 1_1.png","file916":"assets/images/overwolf/Horn 9_16.png","layouts":["left","center"]},{"id":"ov-11","label":"Joystick","file11":"assets/images/overwolf/Joystick  1_1.png","file916":"assets/images/overwolf/Joystick 9_16.png","layouts":["left","center"]},{"id":"ov-12","label":"Keyboard","file11":"assets/images/overwolf/Keyboard 1_1.png","file916":"assets/images/overwolf/Keyboard 9_16.png","layouts":["left","center"]},{"id":"ov-13","label":"Megaphone","file11":"assets/images/overwolf/Megaphone 1_1.png","file916":"assets/images/overwolf/Megaphone 9_16.png","layouts":["left","center"]},{"id":"ov-14","label":"Pen Tool","file11":"assets/images/overwolf/Pen Tool 1_1.png","file916":"assets/images/overwolf/Pen Tool 9_16.png","layouts":["left","center"]},{"id":"ov-15","label":"People","file11":"assets/images/overwolf/People 1_1.png","file916":"assets/images/overwolf/People 9_16.png","layouts":["left","center"]},{"id":"ov-16","label":"Point","file11":"assets/images/overwolf/Point 1_1.png","file916":"assets/images/overwolf/Point 9_16.png","layouts":["left","center"]},{"id":"ov-17","label":"Potions","file11":"assets/images/overwolf/Potions 1_1.png","file916":"assets/images/overwolf/Potions 9_16.png","layouts":["left","center"]},{"id":"ov-18","label":"Rock On","file11":"assets/images/overwolf/Rock On 1_1.png","file916":"assets/images/overwolf/Rock On 9_16.png","layouts":["left","center"]},{"id":"ov-19","label":"Shield","file11":"assets/images/overwolf/Shield 1_1.png","file916":"assets/images/overwolf/Shield 9_16.png","layouts":["left","center"]},{"id":"ov-20","label":"Shopping Cart","file11":"assets/images/overwolf/Shopping Cart 1_1.png","file916":"assets/images/overwolf/Shopping Cart 9_16.png","layouts":["left","center"]},{"id":"ov-21","label":"Star","file11":"assets/images/overwolf/Star 1_1.png","file916":"assets/images/overwolf/Star 9_16.png","layouts":["left","center"]},{"id":"ov-22","label":"Torch","file11":"assets/images/overwolf/Torch 1_1.png","file916":"assets/images/overwolf/Torch 9_16.png","layouts":["left","center"]},{"id":"ov-23","label":"Weapon Stand","file11":"assets/images/overwolf/Weapon Stand 1_1.png","file916":"assets/images/overwolf/Weapon Stand 9_16.png","layouts":["left","center"]}],"tebex":[{"id":"te-01","label":"Accountant","file11":"assets/images/tebex/Accountant 1_1.png","file916":"assets/images/tebex/Accountant 9_16.png","layouts":["left","center"]},{"id":"te-02","label":"Adventure","file11":"assets/images/tebex/Adventure 1_1.png","file916":"assets/images/tebex/Adventure 9_16.png","layouts":["left","center"]},{"id":"te-03","label":"Player Love","file11":"assets/images/tebex/Player Love 1_1.png","file916":"assets/images/tebex/Player Love 9_16.png","layouts":["left","center"]},{"id":"te-04","label":"Rock On","file11":"assets/images/tebex/Rock On 1_1.png","file916":"assets/images/tebex/Rock On 9_16.png","layouts":["left","center"]},{"id":"te-05","label":"Search","file11":"assets/images/tebex/Search 1_1.png","file916":"assets/images/tebex/Search 9_16.png","layouts":["left","center"]},{"id":"te-06","label":"Support","file11":"assets/images/tebex/Support 1_1.png","file916":"assets/images/tebex/Support 9_16.png","layouts":["left","center"]}],"outplayed":[{"id":"ou-01","label":"Grimm Clipper","file11":"assets/images/outplayed/Grimm Clipper 1_1.png","file916":"assets/images/outplayed/Grimm Clipper 9_16.png","layouts":["left","center"]},{"id":"ou-02","label":"UI","file11":"assets/images/outplayed/UI 1_1.png","file916":"assets/images/outplayed/UI 9_16.png","layouts":["left","center"]}]}</div>
-<!-- END IMAGES_DATA -->
+<script src="images-data.js"></script>
 <script src="brands.js"></script>
 <script src="canvas.js"></script>
 <script src="export.js"></script>

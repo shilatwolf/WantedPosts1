@@ -6,34 +6,23 @@ Self-serve internal tool for creating on-brand recruitment banners (LinkedIn 1:1
 
 ## Adding new images
 
-1. Drop the image file into `assets/images/{brand}/`  
-   e.g. `assets/images/overwolf/wolf-forest.jpg`
+1. Drop the image files into `Assets/images/{brand}/`  
+   e.g. `Assets/images/overwolf/wolf-forest-1_1.png` and `Assets/images/overwolf/wolf-forest-9_16.png`
 
-2. Add an entry to `images.json` under the matching brand key:
+2. Run `node generate-manifest.js` from the repo root.
+   That rewrites `images-data.js` with the current asset list.
 
-```json
-{
-  "overwolf": [
-    {
-      "id": "ow-01",
-      "file": "assets/images/overwolf/wolf-forest.jpg",
-      "label": "Wolf in forest",
-      "layouts": ["left", "right", "center"]
-    }
-  ]
-}
-```
+3. Commit the updated `images-data.js` and push to `main`.
 
-3. Push to `main` → Netlify auto-deploys in ~30 seconds. Done.
+### `images-data.js` manifest format
 
-### `images.json` field reference
+`images-data.js` is auto-generated and should not be edited by hand.
+Each entry contains:
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | Unique identifier for this image. Prefix with brand shortcode (`ow-`, `tb-`, `op-`). Never reuse an ID. |
-| `file` | string | Relative path from the repo root. Always starts with `assets/images/`. |
-| `label` | string | Human-readable name shown in the image grid thumbnail tooltip. |
-| `layouts` | array of strings | Which layout options are offered when this image is selected. Valid values: `"left"`, `"right"`, `"center"`. Omit layouts that don't look good compositionally. |
+- `id`: unique image identifier
+- `label`: human-readable visual name
+- `file11`: 1:1 square image path
+- `file916`: 9:16 Stories image path
 
 ---
 
@@ -79,23 +68,16 @@ const BRANDS = {
 };
 ```
 
-2. **Add the horizontal SVG logo** to `assets/logos/mybrand-h.svg`.  
+2. **Add the horizontal SVG logo** to `Assets/logos/mybrand-h.svg`.  
    Logo must be white on transparent background. Use `fill="white"` on all paths.
 
-3. **Add an image pool key** to `images.json`:
+3. Create the image folder: `Assets/images/mybrand/` (drop a `.gitkeep` in it to commit the empty dir).
 
-```json
-{
-  "overwolf": [...],
-  "tebex": [...],
-  "outplayed": [...],
-  "mybrand": []
-}
-```
+4. Add your 1:1 and 9:16 image files into `Assets/images/mybrand/`.
 
-4. **Create the image folder**: `assets/images/mybrand/` (drop a `.gitkeep` in it to commit the empty dir).
+5. Run `node generate-manifest.js` to regenerate `images-data.js`.
 
-5. Push to `main` → the new brand card appears automatically.
+6. Push to `main` → the new brand card appears automatically.
 
 ---
 
@@ -128,7 +110,7 @@ recruitment-banner-generator/
 ├── canvas.js           ← canvas compositing (background, smoke, text, logo)
 ├── export.js           ← PNG / GIF / WebM export + ZIP packaging
 ├── brands.js           ← brand config + preset copy + CTA options
-├── images.json         ← image manifest (designers maintain this)
+├── images-data.js      ← auto-generated asset manifest loaded by the app
 ├── netlify.toml        ← Netlify publish config
 │
 └── assets/
@@ -157,6 +139,6 @@ recruitment-banner-generator/
 
 - Brand (Overwolf / Tebex / Outplayed)
 - Image (from the approved pool for the selected brand)
-- Layout (left / right / center — per the image's `layouts` array)
+- Layout is fixed to left-aligned in the current design.
 - Headline (one preset phrase OR a job title — not both simultaneously)
 - CTA phrase (from the approved list)

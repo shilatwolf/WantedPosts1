@@ -4,7 +4,9 @@
       "Bash(node generate-manifest.js)",
       "WebFetch(domain:wantedposts.netlify.app)",
       "Bash(mv Assets assets_new)",
-      "Bash(mv assets_new assets)"
+      "Bash(mv assets_new assets)",
+      "Bash(node -e \"const fs=require\\('fs'\\); console.log\\('overwolf-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\overwolf-h.svg'\\).toString\\('base64'\\)\\); console.log\\('tebex-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\tebex-h.svg'\\).toString\\('base64'\\)\\); console.log\\('outplayed-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\outplayed-h.svg'\\).toString\\('base64'\\)\\);\")",
+      "Bash(node -e ':*)"
     ]
   }
 }
