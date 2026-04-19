@@ -93,34 +93,26 @@ const EXPORT = (function () {
   /* ── Video: 10-second 9:16 via MediaRecorder ─────────── */
   function makeVideo(state, onProgress) {
     return new Promise(function (resolve, reject) {
-      var FPS      = 30;
-      var DURATION = 10;
-      var S        = CANVAS.S916;
-
-      // Prefer MP4 (required for Instagram Stories).
-      // Chrome 130+ supports video/mp4 natively in MediaRecorder.
-      // Falls back to WebM if MP4 is unavailable.
-      var mime = '', ext = 'mp4';
-      var candidates = [
-        'video/mp4;codecs=avc1',
-        'video/mp4',
-        'video/webm;codecs=vp9',
-        'video/webm'
-      ];
-      if (window.MediaRecorder) {
-        for (var ci = 0; ci < candidates.length; ci++) {
-          if (MediaRecorder.isTypeSupported(candidates[ci])) {
-            mime = candidates[ci];
-            ext  = candidates[ci].startsWith('video/mp4') ? 'mp4' : 'webm';
-            break;
-          }
-        }
-      }
+      var FPS          = 30;
+      var DURATION     = 10;
+      var TOTAL_FRAMES = FPS * DURATION;
+      var S            = CANVAS.S916;
 
       if (!window.MediaRecorder) {
         reject(new Error('MediaRecorder not supported'));
         return;
       }
+
+      // MP4 first (native in Chrome 130+, required for Instagram Stories).
+      // WebM second — re-encoded to MP4 later by ffmpeg.wasm if available.
+      var candidateList = [
+        { mime: 'video/mp4;codecs=avc1.42E01F', ext: 'mp4' },
+        { mime: 'video/mp4;codecs=avc1',        ext: 'mp4' },
+        { mime: 'video/mp4',                    ext: 'mp4' },
+        { mime: 'video/webm;codecs=vp9',        ext: 'webm' },
+        { mime: 'video/webm;codecs=vp8',        ext: 'webm' },
+        { mime: 'video/webm',                   ext: 'webm' }
+      ];
 
       var oc  = document.createElement('canvas');
       oc.width  = S.w;
@@ -128,12 +120,40 @@ const EXPORT = (function () {
       var ctx    = oc.getContext('2d');
       var stream = oc.captureStream(FPS);
 
-      var opts = mime ? { mimeType: mime } : {};
-      var recorder;
-      try {
-        recorder = new MediaRecorder(stream, opts);
-      } catch (e) {
-        reject(e);
+      function tryCreateRecorder(opts) {
+        try {
+          return new MediaRecorder(stream, opts);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      var recorder = null;
+      var chosenMime = '';
+      var chosenExt  = 'webm';
+
+      if (window.MediaRecorder.isTypeSupported) {
+        for (var ci = 0; ci < candidateList.length; ci++) {
+          if (MediaRecorder.isTypeSupported(candidateList[ci].mime)) {
+            recorder = tryCreateRecorder({ mimeType: candidateList[ci].mime });
+            if (recorder) {
+              chosenMime = candidateList[ci].mime;
+              chosenExt  = candidateList[ci].ext;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!recorder) {
+        recorder = tryCreateRecorder({});
+        if (recorder) {
+          chosenMime = recorder.mimeType || 'video/webm';
+          chosenExt  = chosenMime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        }
+      }
+      if (!recorder) {
+        reject(new Error('Failed to create MediaRecorder'));
         return;
       }
 
@@ -142,21 +162,17 @@ const EXPORT = (function () {
         if (e.data && e.data.size > 0) chunks.push(e.data);
       };
       recorder.onstop = function () {
-        var blob = new Blob(chunks, { type: mime || 'video/webm' });
-        resolve({ blob: blob, ext: ext });
+        var blob = new Blob(chunks, { type: chosenMime });
+        resolve({ blob: blob, ext: chosenExt });
       };
       recorder.onerror = function (e) { reject(e); };
 
       var frameNum = 0;
-      var startMs  = null;
+      var recording = true;
 
-      recorder.start(200);
-
-      function tick(ts) {
-        if (startMs === null) startMs = ts;
-        var elapsed = (ts - startMs) / 1000;
-
-        if (elapsed >= DURATION) {
+      function renderNextFrame() {
+        if (!recording || frameNum >= TOTAL_FRAMES) {
+          recording = false;
           recorder.stop();
           return;
         }
@@ -165,22 +181,70 @@ const EXPORT = (function () {
         CANVAS.renderToCtx(ctx, S, state, frameNum, fs, true, true)
           .then(function () {
             frameNum++;
-            if (onProgress) onProgress(elapsed / DURATION);
-            requestAnimationFrame(tick);
+            if (onProgress) onProgress(frameNum / TOTAL_FRAMES);
+            window.requestAnimationFrame(renderNextFrame);
           })
           .catch(function (err) {
+            recording = false;
             recorder.stop();
             reject(err);
           });
       }
 
-      CANVAS.renderToCtx(ctx, S, state, 0, mp4FrameState(0, FPS), true, true)
-        .then(function () { requestAnimationFrame(tick); })
-        .catch(reject);
+      recorder.start();
+      renderNextFrame();
     });
   }
 
-  /* ── Classic anchor-download helper ─────────────────── */
+  var _ffmpeg = null;
+  var _ffmpegLoadPromise = null;
+
+  function _hasFFmpeg() {
+    return (typeof FFmpeg !== 'undefined' && typeof FFmpeg.createFFmpeg === 'function' && typeof FFmpeg.fetchFile === 'function')
+      || (typeof FFmpegWASM !== 'undefined' && typeof FFmpegWASM.createFFmpeg === 'function' && typeof FFmpegWASM.fetchFile === 'function');
+  }
+
+  function _loadFFmpeg() {
+    if (!_hasFFmpeg()) {
+      return Promise.reject(new Error('FFmpeg not loaded'));
+    }
+    if (_ffmpegLoadPromise) {
+      return _ffmpegLoadPromise;
+    }
+    var ffmpegModule = typeof FFmpeg !== 'undefined' ? FFmpeg : FFmpegWASM;
+    _ffmpeg = ffmpegModule.createFFmpeg({ log: false });
+    _ffmpegLoadPromise = _ffmpeg.load();
+    return _ffmpegLoadPromise;
+  }
+
+  function _reencodeVideoToMP4(blob) {
+    if (!_hasFFmpeg()) {
+      return Promise.reject(new Error('FFmpeg not loaded'));
+    }
+    return _loadFFmpeg()
+      .then(function () { var ffmpegModule = typeof FFmpeg !== 'undefined' ? FFmpeg : FFmpegWASM; return ffmpegModule.fetchFile(blob); })
+      .then(function (inputData) {
+        _ffmpeg.FS('writeFile', 'input.webm', inputData);
+        return _ffmpeg.run(
+          '-fflags', '+genpts',
+          '-i', 'input.webm',
+          '-an',
+          '-vf', 'fps=30',
+          '-c:v', 'libx264',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          'output.mp4'
+        );
+      })
+      .then(function () {
+        var outputData = _ffmpeg.FS('readFile', 'output.mp4');
+        try { _ffmpeg.FS('unlink', 'input.webm'); } catch (e) {}
+        try { _ffmpeg.FS('unlink', 'output.mp4'); } catch (e) {}
+        return new Blob([outputData.buffer], { type: 'video/mp4' });
+      });
+  }
+
+  /* ── Classic anchor-download helper ──────────────────── */
   function _fallbackDownload(blob, filename) {
     var url = URL.createObjectURL(blob);
     var a   = document.createElement('a');
@@ -203,7 +267,9 @@ const EXPORT = (function () {
       zip.file('banner-1x1.png',  png11);
       zip.file('banner-1x1.gif',  gif11);
       zip.file('banner-9x16.png', png916);
-      zip.file('banner-9x16.' + videoResult.ext, videoResult.blob);
+      if (videoResult && videoResult.blob && videoResult.ext) {
+        zip.file('banner-9x16.' + videoResult.ext, videoResult.blob);
+      }
       zip.generateAsync({ type: 'blob' }).then(resolve).catch(reject);
     });
   }
@@ -215,11 +281,13 @@ const EXPORT = (function () {
   ──────────────────────────────────────────────────────── */
   function _writeToDir(dir, png11, gif11, png916, videoResult) {
     var files = [
-      { name: 'banner-1x1.png',                     blob: png11 },
-      { name: 'banner-1x1.gif',                     blob: gif11 },
-      { name: 'banner-9x16.png',                    blob: png916 },
-      { name: 'banner-9x16.' + videoResult.ext,     blob: videoResult.blob }
+      { name: 'banner-1x1.png',  blob: png11 },
+      { name: 'banner-1x1.gif',  blob: gif11 },
+      { name: 'banner-9x16.png', blob: png916 }
     ];
+    if (videoResult && videoResult.blob && videoResult.ext) {
+      files.push({ name: 'banner-9x16.' + videoResult.ext, blob: videoResult.blob });
+    }
     return files.reduce(function (chain, f) {
       return chain
         .then(function () { return dir.getFileHandle(f.name, { create: true }); })
@@ -259,6 +327,29 @@ const EXPORT = (function () {
         step(60, 'Recording 9:16 video (10 s)…');
         return makeVideo(state, function (p) {
           step(60 + p * 34, 'Recording video… ' + Math.round(p * 100) + '%');
+        })
+        .catch(function (err) {
+          if (err && /MediaRecorder|not supported|Failed to create MediaRecorder/i.test(err.message || '')) {
+            console.warn('[EXPORT] video export unavailable:', err);
+            return null;
+          }
+          throw err;
+        })
+        .then(function (result) {
+          if (!result || !result.blob) return result;
+          // Already MP4 (Chrome 130+ supports MP4 MediaRecorder natively).
+          if (result.ext === 'mp4') return result;
+          // WebM — try to re-encode via ffmpeg.wasm if loaded.
+          if (_hasFFmpeg()) {
+            step(94, 'Re-encoding video to MP4…');
+            return _reencodeVideoToMP4(result.blob)
+              .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
+              .catch(function (err) {
+                console.warn('[EXPORT] ffmpeg re-encode failed, keeping webm:', err);
+                return result;
+              });
+          }
+          return result;
         });
       })
       .then(function (result) {
@@ -271,13 +362,59 @@ const EXPORT = (function () {
             .then(function () {
               step(100, 'Done!');
               if (onComplete) onComplete({
-                videoExt:   videoResult.ext,
+                videoExt:   videoResult ? videoResult.ext : null,
                 png11Size:  (png11.size  / 1024).toFixed(0),
                 gif11Size:  (gif11.size  / 1024).toFixed(0),
                 png916Size: (png916.size / 1024).toFixed(0),
-                vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+                vidSize:    videoResult ? (videoResult.blob.size / 1024).toFixed(0) : '0',
                 savedAs:    'folder'
               });
+            })
+            .catch(function (err) {
+              console.warn('[EXPORT] folder write failed, falling back to ZIP', err);
+              step(95, 'Packaging ZIP…');
+              return makeZip(png11, gif11, png916, videoResult)
+                .then(function (zipBlob) {
+                  var zipName = (filename && filename.trim())
+                    ? filename.trim() + '.zip'
+                    : 'recruitment-banners.zip';
+
+                  var complete = function () {
+                    step(100, 'Done!');
+                    if (onComplete) onComplete({
+                      videoExt:   videoResult ? videoResult.ext : null,
+                      png11Size:  (png11.size  / 1024).toFixed(0),
+                      gif11Size:  (gif11.size  / 1024).toFixed(0),
+                      png916Size: (png916.size / 1024).toFixed(0),
+                      vidSize:    videoResult ? (videoResult.blob.size / 1024).toFixed(0) : '0',
+                      savedAs:    'zip'
+                    });
+                  };
+
+                  if (window.showSaveFilePicker) {
+                    return window.showSaveFilePicker({
+                      suggestedName: zipName,
+                      types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
+                    })
+                    .then(function (handle) {
+                      return handle.createWritable()
+                        .then(function (w) { return w.write(zipBlob).then(function () { return w.close(); }); });
+                    })
+                    .then(complete)
+                    .catch(function (err) {
+                      if (err && err.name === 'AbortError') {
+                        step(0, '');
+                        if (onError) onError('__cancelled__');
+                        return;
+                      }
+                      _fallbackDownload(zipBlob, zipName);
+                      complete();
+                    });
+                  }
+
+                  _fallbackDownload(zipBlob, zipName);
+                  complete();
+                });
             });
         }
 
@@ -292,11 +429,11 @@ const EXPORT = (function () {
             var complete = function () {
               step(100, 'Done!');
               if (onComplete) onComplete({
-                videoExt:   videoResult.ext,
+                videoExt:   videoResult ? videoResult.ext : null,
                 png11Size:  (png11.size  / 1024).toFixed(0),
                 gif11Size:  (gif11.size  / 1024).toFixed(0),
                 png916Size: (png916.size / 1024).toFixed(0),
-                vidSize:    (videoResult.blob.size / 1024).toFixed(0),
+                vidSize:    videoResult ? (videoResult.blob.size / 1024).toFixed(0) : '0',
                 savedAs:    'zip'
               });
             };

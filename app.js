@@ -502,10 +502,24 @@
   /* ═══════════════════════════════════════════════════════
      EXPORT
   ══════════════════════════════════════════════════════════ */
+  // Lock/unlock the entire wizard panel while an export is in progress.
+  // Without this, users who tweak selections mid-render end up with files
+  // that contain half old / half new state — the renderer reads live state
+  // for each frame.  pointer-events:none + opacity:.5 via .wizard-locked.
+  function setWizardLocked(locked) {
+    var panel = document.querySelector('.wizard-panel');
+    if (panel) panel.classList.toggle('wizard-locked', !!locked);
+    // Also lock the filename input (it lives in the preview panel, outside
+    // .wizard-panel) and the step indicator clicks.
+    var fn = document.getElementById('filename-input');
+    if (fn) fn.disabled = !!locked;
+  }
+
   function _runExport(dirHandle) {
     elBtnExport.style.display    = 'none';
     elProgressWrap.style.display = 'flex';
     elSuccessState.style.display = 'none';
+    setWizardLocked(true);
 
     var filenameEl = document.getElementById('filename-input');
     var filename   = sanitizeFilename(filenameEl ? filenameEl.value : 'recruitment-banners');
@@ -547,18 +561,26 @@
           '</div>' +
           '<div class="success-files">' + fileList + '</div>' +
           noteText +
-          '<div class="action-bar" style="margin-top:12px">' +
-            '<button class="btn-s" id="btn-restart" style="width:100%;justify-content:center">↩ Start Over</button>' +
+          '<div class="success-next-hint">What next?</div>' +
+          '<div class="action-bar action-bar-stack">' +
+            '<button class="btn-p" id="btn-tweak">✎ Make Changes & Export Again</button>' +
+            '<button class="btn-s" id="btn-restart">↩ Start Over</button>' +
           '</div>';
 
         elSuccessState.style.display = 'flex';
         elSuccessState.style.flexDirection = 'column';
         elSuccessState.style.gap = '12px';
 
+        // Wizard stays LOCKED while success state is showing — the user has
+        // to explicitly pick one of the two next-step buttons.  This avoids
+        // the "half-rendered with stale state" bug and makes the flow crisp.
         var restartBtn = document.getElementById('btn-restart');
         if (restartBtn) restartBtn.addEventListener('click', onRestart);
+        var tweakBtn = document.getElementById('btn-tweak');
+        if (tweakBtn) tweakBtn.addEventListener('click', onContinueEditing);
       },
       function (errMsg) {
+        setWizardLocked(false);  // always unlock on error so user can retry
         // '__cancelled__' means the user closed the folder/file picker — restore quietly
         if (errMsg === '__cancelled__') {
           elProgressWrap.style.display = 'none';
@@ -595,10 +617,10 @@
       window.showDirectoryPicker({ id: 'banner-export', startIn: 'downloads', mode: 'readwrite' })
         .then(function (dirHandle) {
           elBtnExport.disabled = false;
-          // Wait for per-image data URL shims to finish loading before rendering.
-          // Usually already done since it kicks off at image-select time, but if
-          // the user is quick, we hold here so the export canvas never has to
-          // fall back to path-based loading (which taints on file://).
+          // Lock the wizard the moment the user commits to this export.
+          // This stops them from tweaking selections during "Preparing…" or
+          // the render itself — mid-render changes produce garbled output.
+          setWizardLocked(true);
           elProgressWrap.style.display = 'flex';
           elProgressLabel.textContent  = 'Preparing image data…';
           _imageDataReady.then(function () { _runExport(dirHandle); });
@@ -607,6 +629,7 @@
           elBtnExport.disabled = false;
           if (err && err.name === 'AbortError') return; // user closed picker — do nothing
           console.warn('[APP] showDirectoryPicker failed, falling back to ZIP', err);
+          setWizardLocked(true);
           elProgressWrap.style.display = 'flex';
           elProgressLabel.textContent  = 'Preparing image data…';
           _imageDataReady.then(function () { _runExport(null); });
@@ -615,9 +638,22 @@
     }
 
     // No showDirectoryPicker — fall back to ZIP
+    setWizardLocked(true);
     elProgressWrap.style.display = 'flex';
     elProgressLabel.textContent  = 'Preparing image data…';
     _imageDataReady.then(function () { _runExport(null); });
+  }
+
+  /* ── Continue editing (after export) ───────────────────
+     Keeps the current selections but unlocks the wizard so the user
+     can tweak something and re-export.  Hides the success state and
+     brings back the export button.                                    */
+  function onContinueEditing() {
+    setWizardLocked(false);
+    elSuccessState.style.display = 'none';
+    elProgressWrap.style.display = 'none';
+    elBtnExport.style.display    = '';
+    elProgressLabel.style.color  = '';
   }
 
   /* ── Start over ──────────────────────────────────────── */
@@ -646,6 +682,7 @@
     if (elPresetMode) elPresetMode.classList.add('hidden');
     if (elPosMode)    elPosMode.classList.add('visible');
 
+    setWizardLocked(false);
     elSuccessState.style.display = 'none';
     elProgressWrap.style.display = 'none';
     elBtnExport.style.display    = '';

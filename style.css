@@ -767,6 +767,36 @@ body {
   letter-spacing:.04em;
 }
 
+.success-next-hint {
+  font-size:10px;
+  color:var(--t3);
+  font-family:var(--font-brand);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  margin-top:6px;
+  opacity:.8;
+}
+
+.action-bar-stack {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:4px;
+}
+.action-bar-stack > button { width:100%; justify-content:center; }
+
+/* ── Locked wizard during export / success state ───────────
+   pointer-events:none stops all clicks, typing, etc.
+   opacity:.45 visually signals "you can't change this right now".
+   The preview canvases stay at full opacity so the user can still
+   see what was rendered. */
+.wizard-locked {
+  pointer-events:none;
+  opacity:.45;
+  filter:grayscale(.3);
+  transition:opacity .18s ease, filter .18s ease;
+}
+
 /* ── Format badge ────────────────────────────────────────── */
 .format-badge {
   display:inline-flex;
