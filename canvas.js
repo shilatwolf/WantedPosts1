@@ -139,34 +139,69 @@ const CANVAS = (function () {
     if (!src) return Promise.resolve(null);
     if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
 
-    // Strategy: fetch → blob URL (guarantees untainted canvas on HTTPS/Netlify).
-    // Falls back to plain new Image() when fetch is blocked or fails — this covers:
-    //   • file:// local testing (Chrome blocks fetch on file://)
-    //   • data: URLs (logos — fetch rejects data: URLs)
-    // Both fallback cases are same-origin, so they never taint the canvas.
+    // The only way to draw an image on a canvas and still call toBlob() is to
+    // ensure the image is "origin-clean".  Drawing a blob: URL image is ALWAYS
+    // origin-clean regardless of where the underlying bytes came from.
+    //
+    // Problem: on file:// Chrome blocks fetch() (since Chrome 94).  Fallback:
+    // XMLHttpRequest still works for same-origin file:// requests.
+    //
+    // Special case: data: URLs (our embedded logos) never taint — load directly.
     return new Promise(function (res) {
-      function fallback() {
-        var img = new Image();
-        img.onload  = function () { _exportImgCache[src] = img; res(img); };
-        img.onerror = function () { res(null); };
-        img.src = encodeURI(src);
+      function store(img) { _exportImgCache[src] = img; res(img); }
+
+      // ── data: URL (embedded logos) ──────────────────────────────────────
+      // Data URLs are same-origin by definition — always safe, skip fetch/XHR.
+      if (src.indexOf('data:') === 0) {
+        var di = new Image();
+        di.onload  = function () { store(di); };
+        di.onerror = function () { res(null); };
+        di.src = src;
+        return;
       }
 
-      if (!window.fetch) { fallback(); return; }
+      // ── Blob URL path: fetch (https://) → XHR (file://) → give up ──────
+      // Once we have a Blob we call URL.createObjectURL() → blob: URL →
+      // new Image().  blob: URLs are always same-origin → no canvas taint.
+      function fromBlob(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload  = function () { store(img); };          // keep blobUrl alive (don't revoke)
+        img.onerror = function () { URL.revokeObjectURL(blobUrl); res(null); };
+        img.src = blobUrl;
+      }
 
-      fetch(encodeURI(src))
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.blob();
-        })
-        .then(function (blob) {
-          var blobUrl = URL.createObjectURL(blob);
-          var img = new Image();
-          img.onload  = function () { _exportImgCache[src] = img; res(img); };
-          img.onerror = function () { URL.revokeObjectURL(blobUrl); fallback(); };
-          img.src = blobUrl;
-        })
-        .catch(function () { fallback(); });  // fetch blocked (file://) or data: URL → use plain Image
+      function tryXHR() {
+        // XHR to file:// same-origin still works in Chrome (fetch does not).
+        // status === 0 is the success indicator for file:// responses.
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', encodeURI(src), true);
+        xhr.responseType = 'blob';
+        xhr.onload = function () {
+          if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+            fromBlob(xhr.response);
+          } else {
+            res(null);   // truly unreachable image — don't hang, just skip
+          }
+        };
+        xhr.onerror = function () { res(null); };
+        xhr.send();
+      }
+
+      // 1. fetch — works on https:// (Netlify), blocked on file://
+      if (window.fetch) {
+        fetch(encodeURI(src))
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+          })
+          .then(fromBlob)
+          .catch(tryXHR);          // fetch blocked → fall through to XHR
+        return;
+      }
+
+      // 2. No fetch API at all → go straight to XHR
+      tryXHR();
     });
   }
 
