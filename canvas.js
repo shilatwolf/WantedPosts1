@@ -171,20 +171,32 @@ const CANVAS = (function () {
         img.src = blobUrl;
       }
 
+      function plainImg() {
+        // Last resort: plain new Image().
+        // On file:// in Chrome/Windows, same-directory images loaded this way
+        // do NOT taint the canvas (confirmed by successful toBlob() in testing).
+        // This path is only reached when both fetch AND XHR are blocked.
+        var img = new Image();
+        img.onload  = function () { store(img); };
+        img.onerror = function () { res(null); };
+        img.src = encodeURI(src);
+      }
+
       function tryXHR() {
-        // XHR to file:// same-origin still works in Chrome (fetch does not).
+        // XHR to file:// same-origin still works in some Chrome versions.
         // status === 0 is the success indicator for file:// responses.
+        // Falls back to plainImg() if XHR is also blocked or returns nothing.
         var xhr = new XMLHttpRequest();
         xhr.open('GET', encodeURI(src), true);
         xhr.responseType = 'blob';
         xhr.onload = function () {
-          if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+          if ((xhr.status === 200 || xhr.status === 0) && xhr.response && xhr.response.size > 0) {
             fromBlob(xhr.response);
           } else {
-            res(null);   // truly unreachable image — don't hang, just skip
+            plainImg();
           }
         };
-        xhr.onerror = function () { res(null); };
+        xhr.onerror = function () { plainImg(); };
         xhr.send();
       }
 
