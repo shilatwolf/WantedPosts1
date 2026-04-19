@@ -81,6 +81,45 @@ const BRANDS = {
 
 ---
 
+## Comeet job positions (live dropdown)
+
+The Position Name field auto-populates with open roles pulled from Comeet on each page load.
+
+### How it works
+
+A Netlify Function (`netlify/functions/jobs.js`) fetches positions server-side from the Comeet Careers API and returns a clean JSON array to the frontend. The Comeet token never reaches the browser.
+
+The frontend populates an `<datalist>` on the position input — users can pick from the list or type a custom title freely. If the function fails or returns nothing, the field silently falls back to plain text input.
+
+### Setting the token
+
+1. Go to **Netlify → Site → Environment variables**
+2. Add a new variable:
+   - **Key:** `COMEET_TOKEN`
+   - **Value:** the token from your Comeet admin account (Integrations → Career Site → API token)
+3. Trigger a redeploy (or it picks up on the next push to `main`)
+
+### Rotating the token
+
+1. Generate a new token in Comeet
+2. Update `COMEET_TOKEN` in Netlify environment variables
+3. Redeploy — the old token is immediately invalid in the function
+
+### What the function returns
+
+```json
+{
+  "positions": [
+    { "title": "Senior Software Engineer", "department": "Engineering", "location": "Tel Aviv" },
+    { "title": "Product Designer - Tebex",  "department": "Design",       "location": "Remote" }
+  ]
+}
+```
+
+Only `is_published: true` positions are included, sorted alphabetically by title. No other Comeet data is exposed to the frontend.
+
+---
+
 ## Deploying
 
 Deployment is automatic. Every push to `main` triggers a Netlify build.

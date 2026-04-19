@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "netlify/functions"
+
 # Serve all assets with CORS headers so canvas.toBlob() never throws
 # "Tainted canvases may not be exported" — required when crossOrigin='anonymous'
 # is set on images drawn to an HTML Canvas.

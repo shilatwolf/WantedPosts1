@@ -694,6 +694,42 @@
   }
 
   /* ═══════════════════════════════════════════════════════
+     JOBS — fetch open positions from Netlify function
+  ══════════════════════════════════════════════════════════ */
+  var _jobsCache = null; // null = not yet fetched, [] = fetched (empty or populated)
+
+  function fetchJobs() {
+    if (_jobsCache !== null) return; // already fetched this session
+
+    fetch('/.netlify/functions/jobs')
+      .then(function (res) { return res.ok ? res.json() : { positions: [] }; })
+      .then(function (data) {
+        _jobsCache = (data.positions || []);
+        populateJobsDatalist(_jobsCache);
+      })
+      .catch(function () {
+        _jobsCache = [];
+      });
+  }
+
+  function populateJobsDatalist(positions) {
+    var dl = document.getElementById('jobs-datalist');
+    var hint = document.getElementById('pos-hint');
+    if (!dl || !positions.length) return;
+
+    positions.forEach(function (p) {
+      var opt = document.createElement('option');
+      opt.value = p.title;
+      // show department + location as the label browsers display alongside the option
+      var meta = [p.department, p.location].filter(Boolean).join(' · ');
+      if (meta) opt.label = meta;
+      dl.appendChild(opt);
+    });
+
+    if (hint) hint.textContent = 'Choose an open position or type a custom title.';
+  }
+
+  /* ═══════════════════════════════════════════════════════
      INIT
   ══════════════════════════════════════════════════════════ */
   function init() {
@@ -711,6 +747,7 @@
     buildPresetGrid();
     buildCTAGrid();
     buildSubLabelChips();
+    fetchJobs();
 
     // Mode toggle buttons
     document.querySelectorAll('.radio-btn').forEach(function (el) {

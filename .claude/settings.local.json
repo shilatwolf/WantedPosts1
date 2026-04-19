@@ -6,7 +6,13 @@
       "Bash(mv Assets assets_new)",
       "Bash(mv assets_new assets)",
       "Bash(node -e \"const fs=require\\('fs'\\); console.log\\('overwolf-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\overwolf-h.svg'\\).toString\\('base64'\\)\\); console.log\\('tebex-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\tebex-h.svg'\\).toString\\('base64'\\)\\); console.log\\('outplayed-h:'\\); console.log\\('data:image/svg+xml;base64,'+fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\user\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Internal Tools\\\\\\\\\\\\\\\\WantedPosts\\\\\\\\\\\\\\\\assets\\\\\\\\\\\\\\\\logos\\\\\\\\\\\\\\\\outplayed-h.svg'\\).toString\\('base64'\\)\\);\")",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "WebFetch(domain:careers.overwolf.com)",
+      "WebFetch(domain:www.comeet.com)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "WebFetch(domain:www.comeet.co)",
+      "WebSearch",
+      "WebFetch(domain:developers.comeet.com)"
     ]
   }
 }
