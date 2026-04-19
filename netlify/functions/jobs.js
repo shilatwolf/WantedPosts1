@@ -1,29 +1,23 @@
-const COMPANY_UID = 'B1.001';
-const COMEET_URL  = `https://www.comeet.co/careers-api/2.0/company/${COMPANY_UID}/positions`;
+const JOBS_URL = 'https://careers.overwolf.com/api/jobs';
 
 exports.handler = async () => {
-  const token = process.env.COMEET_TOKEN;
-
-  if (!token) {
-    return respond(200, { positions: [] });
-  }
-
   try {
-    const res = await fetch(`${COMEET_URL}?token=${token}&details=false`);
+    const res = await fetch(JOBS_URL);
 
     if (!res.ok) {
-      console.error('[jobs] Comeet API error:', res.status, await res.text());
+      console.error('[jobs] upstream error:', res.status);
       return respond(200, { positions: [] });
     }
 
     const data = await res.json();
 
     const positions = data
-      .filter(p => p.is_published)
       .map(p => ({
-        title:      p.name      || '',
+        title:      p.name || '',
         department: p.department || '',
-        location:   (p.location && p.location.name) || '',
+        location:   [p.location && p.location.city, p.workplace_type]
+                      .filter(Boolean).join(' · '),
+        brand:      deriveBrand(p.name || ''),
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
 
@@ -34,6 +28,12 @@ exports.handler = async () => {
     return respond(200, { positions: [] });
   }
 };
+
+function deriveBrand(title) {
+  if (/tebex/i.test(title))     return 'tebex';
+  if (/outplayed/i.test(title)) return 'outplayed';
+  return 'overwolf';
+}
 
 function respond(statusCode, body) {
   return {
