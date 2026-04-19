@@ -14,7 +14,8 @@ const CANVAS = (function () {
   const S11  = { w: 1080, h: 1080 };
   const S916 = { w: 1080, h: 1920 };
 
-  const _imgCache = {};   // shared by preview + export
+  const _imgCache = {};        // preview cache
+  const _exportImgCache = {};  // export-only cache for untainted blobs
   let _seeds = null;
   let _seedKey = '';
 
@@ -46,59 +47,87 @@ const CANVAS = (function () {
      canvas stays untainted so canvas.toBlob() always works.
 
      encodeURI: "Castle 1_1.png" → "Castle%201_1.png"            */
+  function swapAssetsPrefix(src) {
+    if (!src) return src;
+    if (src.indexOf('assets/') === 0) return 'Assets/' + src.slice(7);
+    if (src.indexOf('Assets/') === 0) return 'assets/' + src.slice(7);
+    return src;
+  }
+
   function loadImg(src) {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
 
     var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
+    var altSrc = swapAssetsPrefix(src);
+    var triedAlt = false;
 
     if (isSvg) {
-      // SVG path: fetch → Blob → blob: URL → Image
-      // Using a blob: URL prevents canvas taint (required for toBlob() on export).
-      // Falls back to plain new Image() when fetch is unavailable (file:// local dev).
       return new Promise(function (res) {
-        function fallback() {
-          // file:// or fetch unsupported: plain Image (canvas may taint, but
-          // export only runs on Netlify where fetch works, so this is fine)
+        function fallback(currentSrc) {
           var img = new Image();
           img.onload  = function () { _imgCache[src] = img; res(img); };
-          img.onerror = function () { res(null); };
-          img.src = encodeURI(src);
+          img.onerror = function () {
+            if (!triedAlt && altSrc && currentSrc !== altSrc) {
+              triedAlt = true;
+              fallback(altSrc);
+              return;
+            }
+            res(null);
+          };
+          img.src = encodeURI(currentSrc);
         }
 
-        if (!window.fetch) { fallback(); return; }
+        if (!window.fetch) { fallback(src); return; }
 
-        fetch(encodeURI(src))
-          .then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.blob();
-          })
-          .then(function (blob) {
-            var typed   = new Blob([blob], { type: 'image/svg+xml' });
-            var blobUrl = URL.createObjectURL(typed);
-            var img = new Image();
-            img.onload = function () {
-              _imgCache[src] = img;
-              // Keep blob URL alive — revoking too early can blank the image
-              res(img);
-            };
-            img.onerror = function () {
-              URL.revokeObjectURL(blobUrl);
-              fallback(); // blob decode failed — try direct load
-            };
-            img.src = blobUrl;
-          })
-          .catch(function () {
-            fallback(); // fetch blocked (file://) — use plain Image
-          });
+        function fetchSvg(currentSrc) {
+          return fetch(encodeURI(currentSrc))
+            .then(function (r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.blob();
+            })
+            .then(function (blob) {
+              var typed   = new Blob([blob], { type: 'image/svg+xml' });
+              var blobUrl = URL.createObjectURL(typed);
+              var img = new Image();
+              img.onload = function () {
+                _imgCache[src] = img;
+                res(img);
+              };
+              img.onerror = function () {
+                URL.revokeObjectURL(blobUrl);
+                if (!triedAlt && altSrc && currentSrc !== altSrc) {
+                  triedAlt = true;
+                  fetchSvg(altSrc);
+                } else {
+                  fallback(currentSrc);
+                }
+              };
+              img.src = blobUrl;
+            });
+        }
+
+        fetchSvg(src).catch(function () {
+          if (!triedAlt && altSrc && altSrc !== src) {
+            triedAlt = true;
+            return fetchSvg(altSrc);
+          }
+          fallback(src);
+        });
       });
     }
 
-    // Raster path: plain Image, same-origin, never taints
     return new Promise(function (res) {
+      var triedAlt = false;
+      var altSrc = swapAssetsPrefix(src);
       var img = new Image();
       img.onload  = function () { _imgCache[src] = img; res(img); };
       img.onerror = function () {
+        if (!triedAlt && altSrc && altSrc !== src) {
+          triedAlt = true;
+          img.src = encodeURI(altSrc);
+          return;
+        }
         console.warn('[CANVAS] image load failed:', src);
         res(null);
       };
@@ -106,8 +135,68 @@ const CANVAS = (function () {
     });
   }
 
-  /* loadImgForExport = same loader (SVG path already untainted) */
-  var loadImgForExport = loadImg;
+  function loadImgForExport(src) {
+    if (!src) return Promise.resolve(null);
+    if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
+
+    var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
+    var altSrc = swapAssetsPrefix(src);
+    var triedAlt = false;
+
+    return new Promise(function (res) {
+      function fallback(currentSrc) {
+        var img = new Image();
+        img.onload  = function () { _exportImgCache[src] = img; res(img); };
+        img.onerror = function () {
+          if (!triedAlt && altSrc && currentSrc !== altSrc) {
+            triedAlt = true;
+            fallback(altSrc);
+            return;
+          }
+          res(null);
+        };
+        img.src = encodeURI(currentSrc);
+      }
+
+      if (!window.fetch) { fallback(src); return; }
+
+      function fetchBlob(currentSrc) {
+        return fetch(encodeURI(currentSrc))
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+          })
+          .then(function (blob) {
+            var type = isSvg ? 'image/svg+xml' : blob.type || 'image/png';
+            var blobUrl = URL.createObjectURL(new Blob([blob], { type: type }));
+            var img = new Image();
+            img.onload = function () {
+              URL.revokeObjectURL(blobUrl);
+              _exportImgCache[src] = img;
+              res(img);
+            };
+            img.onerror = function () {
+              URL.revokeObjectURL(blobUrl);
+              if (!triedAlt && altSrc && currentSrc !== altSrc) {
+                triedAlt = true;
+                fetchBlob(altSrc);
+              } else {
+                fallback(currentSrc);
+              }
+            };
+            img.src = blobUrl;
+          });
+      }
+
+      fetchBlob(src).catch(function () {
+        if (!triedAlt && altSrc && altSrc !== src) {
+          triedAlt = true;
+          return fetchBlob(altSrc);
+        }
+        fallback(src);
+      });
+    });
+  }   // ← closes loadImgForExport
 
   /* ── Pre-warm image cache ────────────────────────────────
      Returns a Promise that resolves once all images for the
@@ -117,10 +206,10 @@ const CANVAS = (function () {
     if (!state || !state.brand) return Promise.resolve();
     var brand = BRANDS[state.brand];
     var jobs  = [];
-    if (brand && brand.logo) jobs.push(loadImg(brand.logo));
+    if (brand && brand.logo) jobs.push(loadImgForExport(brand.logo));
     if (state.image) {
-      if (state.image.file11)  jobs.push(loadImg(state.image.file11));
-      if (state.image.file916) jobs.push(loadImg(state.image.file916));
+      if (state.image.file11)  jobs.push(loadImgForExport(state.image.file11));
+      if (state.image.file916) jobs.push(loadImgForExport(state.image.file916));
     }
     return Promise.all(jobs);
   }
@@ -559,6 +648,7 @@ const CANVAS = (function () {
   function resetSeeds() {
     _seeds = null; _seedKey = '';
     Object.keys(_imgCache).forEach(function (k) { delete _imgCache[k]; });
+    Object.keys(_exportImgCache).forEach(function (k) { delete _exportImgCache[k]; });
   }
 
   return {
