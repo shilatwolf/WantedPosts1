@@ -1,5 +1,38 @@
 const JOBS_URL = 'https://careers.overwolf.com/api/jobs';
 
+// Suffixes stripped from titles because the tool already surfaces them
+// as sublabel chips. Order matters — more specific phrases first.
+const SUFFIX_MAP = [
+  { pattern: /maternity\s+leave\s+cover/i, sublabel: 'Maternity Leave Cover *' },
+  { pattern: /part[-\s]time/i,             sublabel: 'Part Time *'             },
+  { pattern: /uk\s+based/i,               sublabel: 'UK Based *'              },
+  { pattern: /us\s+based/i,               sublabel: 'US Based *'              },
+  { pattern: /remote/i,                   sublabel: 'Remote *'                },
+  { pattern: /hybrid/i,                   sublabel: 'Hybrid *'                },
+];
+
+// Remove any known redundant suffix after a dash / pipe / comma separator.
+function cleanTitle(raw) {
+  let title = raw;
+  for (const { pattern } of SUFFIX_MAP) {
+    title = title.replace(
+      new RegExp('\\s*[-–|/,]\\s*' + pattern.source + '\\s*$', 'i'),
+      ''
+    );
+  }
+  return title.trim();
+}
+
+// Return the sublabel chip value implied by the raw title suffix, if any.
+function titleSublabel(raw) {
+  for (const { pattern, sublabel } of SUFFIX_MAP) {
+    if (new RegExp('[-–|/,]\\s*' + pattern.source + '\\s*$', 'i').test(raw)) {
+      return sublabel;
+    }
+  }
+  return '';
+}
+
 exports.handler = async () => {
   try {
     const res = await fetch(JOBS_URL);
@@ -12,13 +45,17 @@ exports.handler = async () => {
     const data = await res.json();
 
     const positions = data
-      .map(p => ({
-        title:         p.name || '',
-        department:    p.department || '',
-        location:      [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
-        workplaceType: p.workplace_type || '',
-        brand:         deriveBrand(p.name || ''),
-      }))
+      .map(p => {
+        const raw = p.name || '';
+        return {
+          title:         cleanTitle(raw),
+          department:    p.department || '',
+          location:      [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
+          workplaceType: p.workplace_type || '',
+          sublabelHint:  titleSublabel(raw),   // from title suffix (priority)
+          brand:         deriveBrand(raw),
+        };
+      })
       .sort((a, b) => a.title.localeCompare(b.title));
 
     return respond(200, { positions });

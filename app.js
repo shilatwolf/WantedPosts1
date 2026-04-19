@@ -770,9 +770,13 @@
       el.classList.toggle('selected', el.dataset.title === pos.title);
     });
 
-    // Auto-select sublabel from workplace type
-    var wt = pos.workplaceType || '';
-    var mapped = /hybrid/i.test(wt) ? 'Hybrid *' : /remote/i.test(wt) ? 'Remote *' : '';
+    // sublabelHint (from title suffix) takes priority; fall back to workplaceType
+    var mapped = pos.sublabelHint || '';
+    if (!mapped) {
+      var wt = pos.workplaceType || '';
+      if (/hybrid/i.test(wt))      mapped = 'Hybrid *';
+      else if (/remote/i.test(wt)) mapped = 'Remote *';
+    }
     if (mapped) {
       clearSubLabel();
       onSubLabelSelect(mapped);
