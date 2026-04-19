@@ -107,21 +107,11 @@
           <div class="radio-btn" data-mode="preset">General Recruiting Messages</div>
         </div>
 
-        <!-- Position input (default) -->
+        <!-- Position chips (default) -->
         <div id="pos-mode" class="pos-mode visible">
-          <div class="pos-input-wrap">
-            <input
-              type="text"
-              id="pos-input"
-              class="pos-input"
-              placeholder="e.g. Data Engineer, Product Designer…"
-              maxlength="80"
-              autocomplete="off"
-              list="jobs-datalist"
-            >
-            <datalist id="jobs-datalist"></datalist>
+          <div id="pos-grid" class="pos-grid">
+            <p class="pos-hint">Loading open positions…</p>
           </div>
-          <p class="pos-hint" id="pos-hint">Job title shown as the banner headline. Long titles auto-scale to fit.</p>
         </div>
 
         <!-- General recruiting messages -->

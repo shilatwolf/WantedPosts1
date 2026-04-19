@@ -13,11 +13,11 @@ exports.handler = async () => {
 
     const positions = data
       .map(p => ({
-        title:      p.name || '',
-        department: p.department || '',
-        location:   [p.location && p.location.city, p.workplace_type]
-                      .filter(Boolean).join(' · '),
-        brand:      deriveBrand(p.name || ''),
+        title:         p.name || '',
+        department:    p.department || '',
+        location:      [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
+        workplaceType: p.workplace_type || '',
+        brand:         deriveBrand(p.name || ''),
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
 

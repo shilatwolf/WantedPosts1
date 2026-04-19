@@ -32,6 +32,12 @@
   /* ── DOM refs ───────────────────────────────────────────── */
   var $ = function (id) { return document.getElementById(id); };
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   var elSteps      = [null, $('step-1'), $('step-2'), $('step-3'), $('step-4')];
   var elSiItems    = document.querySelectorAll('.si-item');
   var elSiLines    = document.querySelectorAll('.si-line');
@@ -39,7 +45,6 @@
   var elBrandGrid  = $('brand-grid');
   var elImageGrid  = $('image-grid');
   var elPresetGrid = $('preset-grid');
-  var elPosInput   = $('pos-input');
   var elPresetMode = $('preset-mode');
   var elPosMode    = $('pos-mode');
   var elCtaGrid    = $('cta-grid');
@@ -205,6 +210,7 @@
     syncBrandGrid();
     buildImageGrid();
     clearPreset();
+    buildPositionChips();
     clearCTA();
     clearSubLabel();
 
@@ -333,9 +339,12 @@
     elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
       el.classList.remove('selected');
     });
+    var posGrid = $('pos-grid');
+    if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
+      el.classList.remove('selected');
+    });
     state.messagePreset   = null;
     state.messagePosition = '';
-    if (elPosInput) elPosInput.value = '';
   }
 
   function onPresetSelect(text) {
@@ -352,7 +361,10 @@
     state.messageMode = mode;
     state.messagePreset   = null;
     state.messagePosition = '';
-    if (elPosInput) elPosInput.value = '';
+    var posGrid = $('pos-grid');
+    if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
+      el.classList.remove('selected');
+    });
 
     document.querySelectorAll('.radio-btn').forEach(function (el) {
       el.classList.toggle('active', el.dataset.mode === mode);
@@ -672,6 +684,7 @@
     syncBrandGrid();
     buildImageGrid();
     clearPreset();
+    buildPositionChips();
     clearCTA();
     clearSubLabel();
 
@@ -705,28 +718,69 @@
       .then(function (res) { return res.ok ? res.json() : { positions: [] }; })
       .then(function (data) {
         _jobsCache = (data.positions || []);
-        populateJobsDatalist(_jobsCache);
+        buildPositionChips();
       })
       .catch(function () {
         _jobsCache = [];
+        buildPositionChips();
       });
   }
 
-  function populateJobsDatalist(positions) {
-    var dl = document.getElementById('jobs-datalist');
-    var hint = document.getElementById('pos-hint');
-    if (!dl || !positions.length) return;
+  function buildPositionChips() {
+    var grid = $('pos-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    var all = _jobsCache || [];
+
+    // Filter by brand when positions exist for that brand
+    var positions = all;
+    if (state.brand) {
+      var branded = all.filter(function (p) { return p.brand === state.brand; });
+      if (branded.length) positions = branded;
+    }
+
+    if (!positions.length) {
+      var msg = document.createElement('p');
+      msg.className = 'pos-hint';
+      msg.textContent = (_jobsCache === null)
+        ? 'Loading open positions…'
+        : 'No open positions right now.';
+      grid.appendChild(msg);
+      return;
+    }
 
     positions.forEach(function (p) {
-      var opt = document.createElement('option');
-      opt.value = p.title;
-      // show department + location as the label browsers display alongside the option
-      var meta = [p.department, p.location].filter(Boolean).join(' · ');
-      if (meta) opt.label = meta;
-      dl.appendChild(opt);
+      var chip = document.createElement('div');
+      chip.className = 'pos-chip';
+      chip.dataset.title = p.title;
+      chip.innerHTML =
+        '<span class="pos-chip-title">' + escapeHtml(p.title) + '</span>' +
+        (p.location ? '<span class="pos-chip-meta">' + escapeHtml(p.location) + '</span>' : '');
+      chip.addEventListener('click', function () { onPositionSelect(p); });
+      grid.appendChild(chip);
+    });
+  }
+
+  function onPositionSelect(pos) {
+    state.messagePosition = pos.title;
+
+    var grid = $('pos-grid');
+    if (grid) grid.querySelectorAll('.pos-chip').forEach(function (el) {
+      el.classList.toggle('selected', el.dataset.title === pos.title);
     });
 
-    if (hint) hint.textContent = 'Choose an open position or type a custom title.';
+    // Auto-select sublabel from workplace type
+    var wt = pos.workplaceType || '';
+    var mapped = /hybrid/i.test(wt) ? 'Hybrid *' : /remote/i.test(wt) ? 'Remote *' : '';
+    if (mapped) {
+      clearSubLabel();
+      onSubLabelSelect(mapped);
+    }
+
+    renderWizard();
+    advance();
+    scheduleRender();
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -753,15 +807,6 @@
     document.querySelectorAll('.radio-btn').forEach(function (el) {
       el.addEventListener('click', function () { onModeToggle(el.dataset.mode); });
     });
-
-    // Position input
-    if (elPosInput) {
-      elPosInput.addEventListener('input', function () {
-        state.messagePosition = elPosInput.value;
-        renderWizard();
-        scheduleRender();
-      });
-    }
 
     // Sub-label other input
     if (elSubOtherInput) {
