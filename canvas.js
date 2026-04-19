@@ -139,64 +139,36 @@ const CANVAS = (function () {
     if (!src) return Promise.resolve(null);
     if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
 
-    var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
-    var altSrc = swapAssetsPrefix(src);
-    var triedAlt = false;
-
+    // Strategy: fetch → blob URL (guarantees untainted canvas on HTTPS/Netlify).
+    // Falls back to plain new Image() when fetch is blocked or fails — this covers:
+    //   • file:// local testing (Chrome blocks fetch on file://)
+    //   • data: URLs (logos — fetch rejects data: URLs)
+    // Both fallback cases are same-origin, so they never taint the canvas.
     return new Promise(function (res) {
-      function fallback(currentSrc) {
+      function fallback() {
         var img = new Image();
         img.onload  = function () { _exportImgCache[src] = img; res(img); };
-        img.onerror = function () {
-          if (!triedAlt && altSrc && currentSrc !== altSrc) {
-            triedAlt = true;
-            fallback(altSrc);
-            return;
-          }
-          res(null);
-        };
-        img.src = encodeURI(currentSrc);
+        img.onerror = function () { res(null); };
+        img.src = encodeURI(src);
       }
 
-      if (!window.fetch) { fallback(src); return; }
+      if (!window.fetch) { fallback(); return; }
 
-      function fetchBlob(currentSrc) {
-        return fetch(encodeURI(currentSrc))
-          .then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.blob();
-          })
-          .then(function (blob) {
-            var type = isSvg ? 'image/svg+xml' : blob.type || 'image/png';
-            var blobUrl = URL.createObjectURL(new Blob([blob], { type: type }));
-            var img = new Image();
-            img.onload = function () {
-              URL.revokeObjectURL(blobUrl);
-              _exportImgCache[src] = img;
-              res(img);
-            };
-            img.onerror = function () {
-              URL.revokeObjectURL(blobUrl);
-              if (!triedAlt && altSrc && currentSrc !== altSrc) {
-                triedAlt = true;
-                fetchBlob(altSrc);
-              } else {
-                fallback(currentSrc);
-              }
-            };
-            img.src = blobUrl;
-          });
-      }
-
-      fetchBlob(src).catch(function () {
-        if (!triedAlt && altSrc && altSrc !== src) {
-          triedAlt = true;
-          return fetchBlob(altSrc);
-        }
-        fallback(src);
-      });
+      fetch(encodeURI(src))
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        })
+        .then(function (blob) {
+          var blobUrl = URL.createObjectURL(blob);
+          var img = new Image();
+          img.onload  = function () { _exportImgCache[src] = img; res(img); };
+          img.onerror = function () { URL.revokeObjectURL(blobUrl); fallback(); };
+          img.src = blobUrl;
+        })
+        .catch(function () { fallback(); });  // fetch blocked (file://) or data: URL → use plain Image
     });
-  }   // ← closes loadImgForExport
+  }
 
   /* ── Pre-warm image cache ────────────────────────────────
      Returns a Promise that resolves once all images for the
