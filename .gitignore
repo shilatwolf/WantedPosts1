@@ -1,0 +1,9 @@
+# Auto-generated base64 data URL shims (~100MB+).
+# Regenerate locally with: node generate-manifest.js
+# Not needed on Netlify — the https:// export uses fetch→blob directly.
+Assets/data/
+assets/data/
+
+# OS cruft
+.DS_Store
+Thumbs.db

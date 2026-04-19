@@ -3,45 +3,255 @@ var IMAGES_DATA = {
   "overwolf": [
     {
       "id": "ov-01",
-      "file": "assets/images/overwolf/1_1 Overwolf-1.png",
-      "label": "1:1 Overwolf 1",
-      "layouts": [
-        "left",
-        "right",
-        "center"
-      ]
+      "label": "Castle",
+      "file11": "Assets/images/overwolf/Castle 1_1.png",
+      "file916": "Assets/images/overwolf/Castle 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-01-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-01-9_16.js"
     },
     {
       "id": "ov-02",
-      "file": "assets/images/overwolf/1_1 Overwolf.png",
-      "label": "1:1 Overwolf",
-      "layouts": [
-        "left",
-        "right",
-        "center"
-      ]
+      "label": "Cogwheels",
+      "file11": "Assets/images/overwolf/Cogwheels 1_1.png",
+      "file916": "Assets/images/overwolf/Cogwheels  9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-02-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-02-9_16.js"
     },
     {
       "id": "ov-03",
-      "file": "assets/images/overwolf/9_16 Overwolf-1.png",
-      "label": "9:16 Overwolf 1",
-      "layouts": [
-        "left",
-        "right",
-        "center"
-      ]
+      "label": "Cursor",
+      "file11": "Assets/images/overwolf/Cursor 1_1.png",
+      "file916": "Assets/images/overwolf/Cursor 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-03-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-03-9_16.js"
     },
     {
       "id": "ov-04",
-      "file": "assets/images/overwolf/9_16 Overwolf.png",
-      "label": "9:16 Overwolf",
-      "layouts": [
-        "left",
-        "right",
-        "center"
-      ]
+      "label": "Dice",
+      "file11": "Assets/images/overwolf/Dice 1_1.png",
+      "file916": "Assets/images/overwolf/Dice 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-04-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-04-9_16.js"
+    },
+    {
+      "id": "ov-05",
+      "label": "Gate",
+      "file11": "Assets/images/overwolf/Gate 1_1.png",
+      "file916": "Assets/images/overwolf/Gate 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-05-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-05-9_16.js"
+    },
+    {
+      "id": "ov-06",
+      "label": "Hammer",
+      "file11": "Assets/images/overwolf/Hammer 1_1.png",
+      "file916": "Assets/images/overwolf/Hammer 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-06-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-06-9_16.js"
+    },
+    {
+      "id": "ov-07",
+      "label": "Hammer 2",
+      "file11": "Assets/images/overwolf/Hammer 2 1_1.png",
+      "file916": "Assets/images/overwolf/Hammer 2 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-07-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-07-9_16.js"
+    },
+    {
+      "id": "ov-08",
+      "label": "Heart",
+      "file11": "Assets/images/overwolf/Heart 1_1.png",
+      "file916": "Assets/images/overwolf/Heart 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-08-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-08-9_16.js"
+    },
+    {
+      "id": "ov-09",
+      "label": "Helmet",
+      "file11": "Assets/images/overwolf/Helmet 1_1.png",
+      "file916": "Assets/images/overwolf/Helmet 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-09-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-09-9_16.js"
+    },
+    {
+      "id": "ov-10",
+      "label": "Horn",
+      "file11": "Assets/images/overwolf/Horn 1_1.png",
+      "file916": "Assets/images/overwolf/Horn 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-10-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-10-9_16.js"
+    },
+    {
+      "id": "ov-11",
+      "label": "Joystick",
+      "file11": "Assets/images/overwolf/Joystick  1_1.png",
+      "file916": "Assets/images/overwolf/Joystick 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-11-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-11-9_16.js"
+    },
+    {
+      "id": "ov-12",
+      "label": "Keyboard",
+      "file11": "Assets/images/overwolf/Keyboard 1_1.png",
+      "file916": "Assets/images/overwolf/Keyboard 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-12-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-12-9_16.js"
+    },
+    {
+      "id": "ov-13",
+      "label": "Megaphone",
+      "file11": "Assets/images/overwolf/Megaphone 1_1.png",
+      "file916": "Assets/images/overwolf/Megaphone 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-13-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-13-9_16.js"
+    },
+    {
+      "id": "ov-14",
+      "label": "Pen Tool",
+      "file11": "Assets/images/overwolf/Pen Tool 1_1.png",
+      "file916": "Assets/images/overwolf/Pen Tool 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-14-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-14-9_16.js"
+    },
+    {
+      "id": "ov-15",
+      "label": "People",
+      "file11": "Assets/images/overwolf/People 1_1.png",
+      "file916": "Assets/images/overwolf/People 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-15-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-15-9_16.js"
+    },
+    {
+      "id": "ov-16",
+      "label": "Point",
+      "file11": "Assets/images/overwolf/Point 1_1.png",
+      "file916": "Assets/images/overwolf/Point 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-16-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-16-9_16.js"
+    },
+    {
+      "id": "ov-17",
+      "label": "Potions",
+      "file11": "Assets/images/overwolf/Potions 1_1.png",
+      "file916": "Assets/images/overwolf/Potions 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-17-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-17-9_16.js"
+    },
+    {
+      "id": "ov-18",
+      "label": "Rock On",
+      "file11": "Assets/images/overwolf/Rock On 1_1.png",
+      "file916": "Assets/images/overwolf/Rock On 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-18-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-18-9_16.js"
+    },
+    {
+      "id": "ov-19",
+      "label": "Shield",
+      "file11": "Assets/images/overwolf/Shield 1_1.png",
+      "file916": "Assets/images/overwolf/Shield 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-19-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-19-9_16.js"
+    },
+    {
+      "id": "ov-20",
+      "label": "Shopping Cart",
+      "file11": "Assets/images/overwolf/Shopping Cart 1_1.png",
+      "file916": "Assets/images/overwolf/Shopping Cart 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-20-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-20-9_16.js"
+    },
+    {
+      "id": "ov-21",
+      "label": "Star",
+      "file11": "Assets/images/overwolf/Star 1_1.png",
+      "file916": "Assets/images/overwolf/Star 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-21-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-21-9_16.js"
+    },
+    {
+      "id": "ov-22",
+      "label": "Torch",
+      "file11": "Assets/images/overwolf/Torch 1_1.png",
+      "file916": "Assets/images/overwolf/Torch 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-22-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-22-9_16.js"
+    },
+    {
+      "id": "ov-23",
+      "label": "Weapon Stand",
+      "file11": "Assets/images/overwolf/Weapon Stand 1_1.png",
+      "file916": "Assets/images/overwolf/Weapon Stand 9_16.png",
+      "dataScript11": "Assets/data/overwolf/ov-23-1_1.js",
+      "dataScript916": "Assets/data/overwolf/ov-23-9_16.js"
     }
   ],
-  "tebex": [],
-  "outplayed": []
+  "tebex": [
+    {
+      "id": "te-01",
+      "label": "Accountant",
+      "file11": "Assets/images/tebex/Accountant 1_1.png",
+      "file916": "Assets/images/tebex/Accountant 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-01-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-01-9_16.js"
+    },
+    {
+      "id": "te-02",
+      "label": "Adventure",
+      "file11": "Assets/images/tebex/Adventure 1_1.png",
+      "file916": "Assets/images/tebex/Adventure 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-02-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-02-9_16.js"
+    },
+    {
+      "id": "te-03",
+      "label": "Player Love",
+      "file11": "Assets/images/tebex/Player Love 1_1.png",
+      "file916": "Assets/images/tebex/Player Love 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-03-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-03-9_16.js"
+    },
+    {
+      "id": "te-04",
+      "label": "Rock On",
+      "file11": "Assets/images/tebex/Rock On 1_1.png",
+      "file916": "Assets/images/tebex/Rock On 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-04-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-04-9_16.js"
+    },
+    {
+      "id": "te-05",
+      "label": "Search",
+      "file11": "Assets/images/tebex/Search 1_1.png",
+      "file916": "Assets/images/tebex/Search 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-05-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-05-9_16.js"
+    },
+    {
+      "id": "te-06",
+      "label": "Support",
+      "file11": "Assets/images/tebex/Support 1_1.png",
+      "file916": "Assets/images/tebex/Support 9_16.png",
+      "dataScript11": "Assets/data/tebex/te-06-1_1.js",
+      "dataScript916": "Assets/data/tebex/te-06-9_16.js"
+    }
+  ],
+  "outplayed": [
+    {
+      "id": "ou-01",
+      "label": "Grimm Clipper",
+      "file11": "Assets/images/outplayed/Grimm Clipper 1_1.png",
+      "file916": "Assets/images/outplayed/Grimm Clipper 9_16.png",
+      "dataScript11": "Assets/data/outplayed/ou-01-1_1.js",
+      "dataScript916": "Assets/data/outplayed/ou-01-9_16.js"
+    },
+    {
+      "id": "ou-02",
+      "label": "UI",
+      "file11": "Assets/images/outplayed/UI 1_1.png",
+      "file916": "Assets/images/outplayed/UI 9_16.png",
+      "dataScript11": "Assets/data/outplayed/ou-02-1_1.js",
+      "dataScript916": "Assets/data/outplayed/ou-02-9_16.js"
+    }
+  ]
 };

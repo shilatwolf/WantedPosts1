@@ -137,14 +137,24 @@ const CANVAS = (function () {
 
   function loadImgForExport(src) {
     if (!src) return Promise.resolve(null);
+
+    // ── PRIMARY PATH: pre-generated base64 data URL ─────────────────────
+    // generate-manifest.js writes a tiny JS shim per image that registers
+    // the image as a data: URL under its file path.  app.js loads these
+    // shims when the user selects an image.  Using the data: URL directly
+    // avoids ALL canvas-taint issues because data: URLs are always
+    // same-origin — this is the ONLY approach that works reliably on
+    // file:// (where fetch() and XHR are both blocked by Chrome).
+    if (typeof window !== 'undefined' && window._imgData && window._imgData[src]) {
+      src = window._imgData[src];
+    }
+
     if (_exportImgCache[src]) return Promise.resolve(_exportImgCache[src]);
 
-    // The only way to draw an image on a canvas and still call toBlob() is to
-    // ensure the image is "origin-clean".  Drawing a blob: URL image is ALWAYS
-    // origin-clean regardless of where the underlying bytes came from.
-    //
-    // Problem: on file:// Chrome blocks fetch() (since Chrome 94).  Fallback:
-    // XMLHttpRequest still works for same-origin file:// requests.
+    // ── FALLBACK PATH (mostly Netlify/https://) ─────────────────────────
+    // If no data shim is loaded, fall back to fetch→blob→Image.  On
+    // https:// this produces an untainted blob: URL.  On file:// without
+    // shims there is nothing we can do — plainImg() taints the canvas.
     //
     // Special case: data: URLs (our embedded logos) never taint — load directly.
     return new Promise(function (res) {
@@ -172,10 +182,11 @@ const CANVAS = (function () {
       }
 
       function plainImg() {
-        // Last resort: plain new Image().
-        // On file:// in Chrome/Windows, same-directory images loaded this way
-        // do NOT taint the canvas (confirmed by successful toBlob() in testing).
-        // This path is only reached when both fetch AND XHR are blocked.
+        // Absolute last resort — used only when the data URL shim wasn't
+        // preloaded AND fetch/XHR both failed.  On file:// this DOES taint
+        // the canvas, but we've run out of options.  Normal file:// export
+        // goes through the PRIMARY PATH (window._imgData) above and never
+        // reaches here.
         var img = new Image();
         img.onload  = function () { store(img); };
         img.onerror = function () { res(null); };

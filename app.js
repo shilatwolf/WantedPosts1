@@ -265,13 +265,47 @@
     });
   }
 
+  // Kick off loading of the per-image base64 data URL shims in the background.
+  // These are REQUIRED for export to work on file:// (Chrome blocks fetch + XHR),
+  // and also guarantee an untainted canvas on https://.  Each shim populates
+  // window._imgData[path] = 'data:image/png;base64,...' which canvas.js reads
+  // inside loadImgForExport.
+  var _dataScriptsLoaded = {};   // scriptPath → Promise<void>
+  function loadDataScript(scriptPath) {
+    if (!scriptPath) return Promise.resolve();
+    if (_dataScriptsLoaded[scriptPath]) return _dataScriptsLoaded[scriptPath];
+    _dataScriptsLoaded[scriptPath] = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = scriptPath;
+      s.onload  = function () { resolve(); };
+      s.onerror = function () {
+        console.warn('[app] failed to load data URL shim:', scriptPath);
+        resolve();   // proceed anyway — export will fall back to fetch/XHR
+      };
+      document.head.appendChild(s);
+    });
+    return _dataScriptsLoaded[scriptPath];
+  }
+
+  // Promise that resolves when the currently-selected image's data shims
+  // have finished loading.  onExport awaits this before running the render
+  // pipeline so toBlob() always succeeds on file://.
+  var _imageDataReady = Promise.resolve();
+
   function onImageSelect(img) {
     state.image  = img;
     state.layout = 'left';
     CANVAS.resetSeeds();
     syncImageGrid();
     renderWizard();
-    // Prewarm (fetches background image), then render
+
+    // Start loading data URL shims in parallel (non-blocking for preview)
+    _imageDataReady = Promise.all([
+      loadDataScript(img.dataScript11),
+      loadDataScript(img.dataScript916)
+    ]);
+
+    // Prewarm preview, then render
     CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
 
@@ -454,6 +488,17 @@
     });
   }
 
+  function sanitizeFilename(name) {
+    if (!name) return 'recruitment-banners';
+    return name
+      .trim()
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'recruitment-banners';
+  }
+
   /* ═══════════════════════════════════════════════════════
      EXPORT
   ══════════════════════════════════════════════════════════ */
@@ -463,7 +508,7 @@
     elSuccessState.style.display = 'none';
 
     var filenameEl = document.getElementById('filename-input');
-    var filename   = filenameEl ? filenameEl.value : 'recruitment-banners';
+    var filename   = sanitizeFilename(filenameEl ? filenameEl.value : 'recruitment-banners');
 
     EXPORT.generatePackage(
       state,
@@ -476,22 +521,31 @@
 
         var folderSave = info.savedAs === 'folder';
         var titleText  = folderSave ? 'Files saved to folder!' : 'Package downloaded!';
-        var noteText   = folderSave
-          ? '<p class="success-note" style="color:var(--tok)">✓ Saved directly — no ZIP, no security warnings.</p>'
-          : (info.videoExt === 'webm' ? '<p class="success-note">⚠ Video saved as .webm — rename to .mp4 if needed.</p>' : '');
+        var noteText = '';
+        if (folderSave) {
+          noteText = '<p class="success-note" style="color:var(--tok)">✓ Saved directly — no ZIP, no security warnings.</p>';
+        } else if (info.videoExt === 'webm') {
+          noteText = '<p class="success-note">⚠ Video saved as .webm — rename to .mp4 if needed.</p>';
+        } else if (!info.videoExt) {
+          noteText = '<p class="success-note">⚠ Video export unavailable in this browser; package contains PNG + GIF only.</p>';
+        }
+
+        var fileList = '' +
+          '<div class="success-file">banner-1x1.png <span>'  + info.png11Size  + ' KB</span></div>' +
+          '<div class="success-file">banner-1x1.gif <span>'  + info.gif11Size  + ' KB</span></div>' +
+          '<div class="success-file">banner-9x16.png <span>' + info.png916Size + ' KB</span></div>';
+
+        if (info.videoExt) {
+          fileList += '<div class="success-file">banner-9x16.' + info.videoExt +
+            ' <span class="' + (info.videoExt === 'webm' ? 'webm' : '') + '">' + info.vidSize + ' KB</span></div>';
+        }
 
         elSuccessState.innerHTML =
           '<div class="success-header">' +
             '<div class="success-icon">✓</div>' +
             '<span class="success-title">' + titleText + '</span>' +
           '</div>' +
-          '<div class="success-files">' +
-            '<div class="success-file">banner-1x1.png <span>'  + info.png11Size  + ' KB</span></div>' +
-            '<div class="success-file">banner-1x1.gif <span>'  + info.gif11Size  + ' KB</span></div>' +
-            '<div class="success-file">banner-9x16.png <span>' + info.png916Size + ' KB</span></div>' +
-            '<div class="success-file">banner-9x16.' + info.videoExt +
-              ' <span class="' + (info.videoExt === 'webm' ? 'webm' : '') + '">' + info.vidSize + ' KB</span></div>' +
-          '</div>' +
+          '<div class="success-files">' + fileList + '</div>' +
           noteText +
           '<div class="action-bar" style="margin-top:12px">' +
             '<button class="btn-s" id="btn-restart" style="width:100%;justify-content:center">↩ Start Over</button>' +
@@ -541,18 +595,29 @@
       window.showDirectoryPicker({ id: 'banner-export', startIn: 'downloads', mode: 'readwrite' })
         .then(function (dirHandle) {
           elBtnExport.disabled = false;
-          _runExport(dirHandle);
+          // Wait for per-image data URL shims to finish loading before rendering.
+          // Usually already done since it kicks off at image-select time, but if
+          // the user is quick, we hold here so the export canvas never has to
+          // fall back to path-based loading (which taints on file://).
+          elProgressWrap.style.display = 'flex';
+          elProgressLabel.textContent  = 'Preparing image data…';
+          _imageDataReady.then(function () { _runExport(dirHandle); });
         })
         .catch(function (err) {
           elBtnExport.disabled = false;
           if (err && err.name === 'AbortError') return; // user closed picker — do nothing
           console.warn('[APP] showDirectoryPicker failed, falling back to ZIP', err);
-          _runExport(null);
+          elProgressWrap.style.display = 'flex';
+          elProgressLabel.textContent  = 'Preparing image data…';
+          _imageDataReady.then(function () { _runExport(null); });
         });
       return;
     }
 
-    _runExport(null); // no showDirectoryPicker — fall back to ZIP
+    // No showDirectoryPicker — fall back to ZIP
+    elProgressWrap.style.display = 'flex';
+    elProgressLabel.textContent  = 'Preparing image data…';
+    _imageDataReady.then(function () { _runExport(null); });
   }
 
   /* ── Start over ──────────────────────────────────────── */
