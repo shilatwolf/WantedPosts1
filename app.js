@@ -26,7 +26,11 @@
     'Remote *',
     'Hybrid *',
     'Part Time *',
-    'Maternity Leave Cover *'
+    'Maternity Leave Cover *',
+    'Outplayed',
+    'Tebex',
+    'CurseForge',
+    'Overwolf Ads',
   ];
 
   /* ── DOM refs ───────────────────────────────────────────── */

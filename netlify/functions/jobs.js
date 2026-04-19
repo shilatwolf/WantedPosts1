@@ -1,14 +1,22 @@
 const JOBS_URL = 'https://careers.overwolf.com/api/jobs';
 
 // Suffixes stripped from titles because the tool already surfaces them
-// as sublabel chips. Order matters — more specific phrases first.
+// as sublabel chips or brand filters. Order matters — more specific first.
+// sublabel: '' means strip-only (no auto-select).
 const SUFFIX_MAP = [
+  // Work arrangement — strip AND auto-select sublabel chip
   { pattern: /maternity\s+leave\s+cover/i, sublabel: 'Maternity Leave Cover *' },
   { pattern: /part[-\s]time/i,             sublabel: 'Part Time *'             },
   { pattern: /uk\s+based/i,               sublabel: 'UK Based *'              },
   { pattern: /us\s+based/i,               sublabel: 'US Based *'              },
   { pattern: /remote/i,                   sublabel: 'Remote *'                },
   { pattern: /hybrid/i,                   sublabel: 'Hybrid *'                },
+  // Brand qualifiers — strip only (brand is already captured in the brand filter)
+  { pattern: /overwolf\s+ads?/i,          sublabel: ''                        },
+  { pattern: /brand\s+partnerships?/i,    sublabel: ''                        },
+  { pattern: /curseforge/i,              sublabel: ''                        },
+  { pattern: /outplayed/i,              sublabel: ''                        },
+  { pattern: /tebex/i,                  sublabel: ''                        },
 ];
 
 // Remove any known redundant suffix after a dash / pipe / comma separator.
