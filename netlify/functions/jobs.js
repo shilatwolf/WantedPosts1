@@ -56,17 +56,26 @@ exports.handler = async () => {
       .map(p => {
         const raw = p.name || '';
         return {
-          title:          cleanTitle(raw),
-          department:     p.department || '',
-          location:       [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
-          workplaceType:  p.workplace_type || '',
-          sublabelHint:   titleSublabel(raw),   // from title suffix (priority)
-          brand:          deriveBrand(raw),
+          // Raw title for title-based suggestion matching (e.g. "maternity")
+          rawName:         raw,
+          title:           cleanTitle(raw),
+          department:      p.department || '',
+          // Human-readable summary, used by the chip row
+          location:        [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
+          // Structured fields for the position-detail strip + extractSuggestions
+          city:            (p.location && p.location.city) || '',
+          country:         (p.location && p.location.country) || '',
+          isRemote:        !!(p.location && p.location.is_remote),
+          workplaceType:   p.workplace_type || '',
+          employmentType:  p.employment_type || '',
+          experienceLevel: p.experience_level || '',
+          sublabelHint:    titleSublabel(raw),   // from title suffix (priority)
+          brand:           deriveBrand(raw),
           // Referral bridge (§9) — link to Comeet's page where the employee
           // authenticates to get a personal ?ref= token.  Reward amount is
           // surfaced in the nudge if present.
-          urlActivePage:  p.url_active_page || '',
-          referralReward: p.company_referrals_reward || '',
+          urlActivePage:   p.url_active_page || '',
+          referralReward:  p.company_referrals_reward || '',
         };
       })
       .sort((a, b) => a.title.localeCompare(b.title));

@@ -586,27 +586,66 @@ body {
   font-size:10px;
 }
 .sublabel-other-wrap { margin-top:var(--sp-200); }
-.sublabel-smart-header {
+
+/* Smart Suggestions — dedicated box above the full pool */
+.sublabel-smart-box {
+  margin-bottom:var(--sp-400);
+  padding:var(--sp-400);
+  background:var(--s1);
+  border:1px solid var(--ow-f);
+}
+.sublabel-smart-title {
   font-family:var(--font-brand);
-  font-size:11px;
-  font-weight:700;
+  font-size:10px;
+  font-weight:var(--fw-bold);
   letter-spacing:.10em;
   text-transform:uppercase;
   color:var(--accent);
-  margin:0 0 var(--sp-200);
+  margin:0;
 }
 .sublabel-smart-hint {
-  font-weight:400;
-  opacity:.6;
-  text-transform:none;
-  letter-spacing:0;
+  font-family:var(--font-body);
+  font-size:11px;
   color:var(--t3);
-  margin-left:6px;
+  margin:2px 0 var(--sp-300);
+}
+.sublabel-smart-chips {
+  display:flex;
+  flex-wrap:wrap;
+  gap:var(--sp-200);
 }
 .pos-live-hint {
   margin:0 0 var(--sp-300);
   color:var(--t3);
   font-style:italic;
+}
+
+/* Position detail strip — muted pill row surfacing structured fields
+   (location, department, employment type, experience, workplace type). */
+.pos-detail {
+  display:flex;
+  flex-wrap:wrap;
+  gap:var(--sp-300);
+  row-gap:6px;
+  margin-top:var(--sp-300);
+  padding:var(--sp-300) var(--sp-400);
+  background:var(--s1);
+  border:1px solid var(--b4);
+}
+.pos-detail-item {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-family:var(--font-body);
+  font-size:11px;
+  color:var(--t3);
+}
+.pos-detail-icon {
+  font-size:11px;
+  opacity:0.8;
+}
+.pos-detail-value {
+  color:var(--t2);
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
@@ -1124,6 +1163,36 @@ footer {
   font-size:14px;
   color:var(--t3);
   margin:0;
+}
+
+/* Desktop side-by-side layout for the two format groups */
+.results-formats-row {
+  display:flex;
+  flex-direction:column;
+  gap:var(--sp-600);
+}
+@media (min-width: 768px) {
+  .results-formats-row {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:var(--sp-600);
+    align-items:start;
+  }
+  /* Keep the 1:1 preview from dominating on wide screens */
+  .results-formats-row .results-card-primary .results-preview-square {
+    max-width:360px;
+    margin:0 auto;
+  }
+  /* Desktop: story card becomes vertical with portrait centered */
+  .results-formats-row .results-card-story {
+    flex-direction:column;
+    gap:var(--sp-400);
+  }
+  .results-formats-row .results-card-story .results-preview-story {
+    width:100px;
+    height:178px;
+    align-self:center;
+  }
 }
 
 /* Groups (square / story) */

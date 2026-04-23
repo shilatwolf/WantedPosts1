@@ -326,10 +326,15 @@ const CANVAS = (function () {
      t = elapsed seconds. y wraps via modulo so frame 0 and the last
      frame match exactly — guaranteed seamless loop.
 
+     When loopSeconds is supplied, each particle's vertical travel
+     is quantized to an integer number of full wraparounds over the
+     loop.  Without this the recorded endframe and frame 0 land at
+     subtly different positions and the loop hitches on every pass.
+
      yFade multiplier fades every layer toward the top of the canvas,
      keeping the headline area clean.  Bottom 40% is fully opaque;
      the top third is nearly invisible.                              */
-  function drawSmoke(ctx, w, h, seeds, t, emberColor) {
+  function drawSmoke(ctx, w, h, seeds, t, emberColor, loopSeconds) {
     ctx.save();
     t = t || 0;
 
@@ -340,10 +345,21 @@ const CANVAS = (function () {
     function yFadeAt(y) {
       return Math.min(1, y / (h * 0.6));
     }
+    // Quantized drift: integer cycles per loop → position at t=0 and
+    // t=loopSeconds are identical by construction.
+    function driftDist(p, extent) {
+      var span = h + extent * 2;
+      if (loopSeconds) {
+        var cycles = Math.max(1, Math.round(p.spd * loopSeconds / span));
+        var u = ((t % loopSeconds) + loopSeconds) % loopSeconds / loopSeconds;
+        return u * cycles * span;
+      }
+      return t * p.spd;
+    }
 
     // ── Layer 1: deep smoke (dark radial gradients) ─────
     seeds.deepSmoke.forEach(function (p) {
-      var drift = t * p.spd;
+      var drift = driftDist(p, p.rad);
       var y = wrapY(p.y - drift, p.rad);
       var fade = yFadeAt(y);
       if (fade <= 0) return;
@@ -359,7 +375,7 @@ const CANVAS = (function () {
 
     // ── Layer 2: mid smoke (smaller wisps + sine drift) ─
     seeds.midSmoke.forEach(function (p) {
-      var drift = t * p.spd;
+      var drift = driftDist(p, p.rad);
       var y = wrapY(p.y - drift, p.rad);
       var x = p.xBase + Math.sin(y * 0.015 + p.phase) * 12;
       var fade = yFadeAt(y);
@@ -376,7 +392,7 @@ const CANVAS = (function () {
 
     // ── Layer 3: fine particles (small grey dots) ───────
     seeds.fineDots.forEach(function (p) {
-      var drift = t * p.spd;
+      var drift = driftDist(p, 6);
       var y = wrapY(p.y - drift, 6);
       var fade = yFadeAt(y);
       if (fade <= 0) return;
@@ -391,12 +407,21 @@ const CANVAS = (function () {
     if (emberColor) {
       var rgb = hexToRGB(emberColor);
       seeds.embers.forEach(function (p) {
-        var drift = t * p.spd;
+        var drift = driftDist(p, 4);
         var y = wrapY(p.y - drift, 4);
         var fade = yFadeAt(y);
         if (fade <= 0) return;
-        // Gentle flicker — frame-rate independent, seamless across loops
-        var flicker = 0.65 + 0.35 * Math.sin(t * Math.PI * 2 * 0.9 + p.flickerPhase);
+        // Flicker must also loop seamlessly — quantize to integer cycles
+        // across the loop so sin() returns to the same phase at t=0 and t=LOOP.
+        var flickerT;
+        if (loopSeconds) {
+          var flickCycles = Math.max(1, Math.round(0.9 * loopSeconds));
+          var uL = ((t % loopSeconds) + loopSeconds) % loopSeconds / loopSeconds;
+          flickerT = uL * flickCycles;
+        } else {
+          flickerT = t * 0.9;
+        }
+        var flicker = 0.65 + 0.35 * Math.sin(flickerT * Math.PI * 2 + p.flickerPhase);
         var alpha   = Math.min(1, p.op * fade * flicker);
         ctx.beginPath();
         ctx.arc(p.x, y, p.rad, 0, Math.PI * 2);
@@ -686,8 +711,10 @@ const CANVAS = (function () {
     // Preview renders at frame=0, t=0 (static snapshot is fine).
     var t = (fstate && fstate.t !== undefined) ? fstate.t : (frame || 0) / 15;
 
+    var loopSeconds = (fstate && fstate.loopSeconds) || null;
+
     drawBg(ctx, bgImg, w, h);
-    drawSmoke(ctx, w, h, seeds, t, brand.emberColor || null);
+    drawSmoke(ctx, w, h, seeds, t, brand.emberColor || null, loopSeconds);
     if (msg) drawText(ctx, zones, brand, msg, cta || '', subLabel, is916, fstate || {});
     drawLogo(ctx, logoImg, zones.logo);
   }

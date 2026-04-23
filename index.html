@@ -124,6 +124,9 @@
             <p class="pos-hint">Loading open positions…</p>
           </div>
 
+          <!-- Detail strip for the selected position (revealed on selection) -->
+          <div id="pos-detail" class="pos-detail" style="display:none"></div>
+
           <!-- Referral nudge (position mode only, revealed on selection) -->
           <div class="referral-nudge" id="referral-nudge" style="display:none">
             <div class="referral-nudge-body">
@@ -153,7 +156,14 @@
 
         <!-- Optional sub-label note under the button -->
         <div class="sublabel-section">
-          <p class="sublabel-smart-header" id="sublabel-smart-header" style="display:none">✦ Smart Suggestions <span class="sublabel-smart-hint">based on the selected position</span></p>
+
+          <!-- Smart Suggestions — only shows when there are auto-extracted chips -->
+          <div class="sublabel-smart-box" id="sublabel-smart-box" style="display:none">
+            <p class="sublabel-smart-title">✦ Smart Suggestions</p>
+            <p class="sublabel-smart-hint">Based on this position's details</p>
+            <div class="sublabel-smart-chips" id="sublabel-smart-chips"></div>
+          </div>
+
           <p class="sublabel-heading">Add a note <span class="sublabel-optional">(optional — pick one or more)</span></p>
           <div class="sublabel-chips" id="sublabel-chips"></div>
           <div id="sublabel-other-wrap" class="sublabel-other-wrap" style="display:none">
@@ -225,6 +235,9 @@
       <p class="results-subtitle" id="results-subtitle"></p>
     </header>
 
+    <!-- ── Format groups (side-by-side on desktop) ───── -->
+    <div class="results-formats-row">
+
     <!-- ── Square format ──────────────────────────────── -->
     <div class="results-group">
       <div class="results-group-label">LinkedIn · Square format</div>
@@ -272,8 +285,6 @@
       </details>
     </div>
 
-    <div class="results-divider"></div>
-
     <!-- ── Story format ───────────────────────────────── -->
     <div class="results-group">
       <div class="results-group-label">Stories · Vertical format</div>
@@ -320,6 +331,8 @@
         </article>
       </details>
     </div>
+
+    </div><!-- /results-formats-row -->
 
     <!-- ── Referral link (position mode only) ─────────── -->
     <div class="results-referral" id="results-referral" style="display:none">

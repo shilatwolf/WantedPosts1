@@ -31,6 +31,7 @@
   var SUBLABEL_OPTIONS = [
     'UK Based *',
     'US Based *',
+    'Israel Based *',
     'Remote *',
     'Hybrid *',
     'Part Time *',
@@ -40,6 +41,56 @@
     'CurseForge',
     'Overwolf Ads',
   ];
+
+  // ISO 3166-1 alpha-2 country codes → human-readable names used by the
+  // position detail strip + extractSuggestions.
+  var COUNTRY_NAMES = {
+    IL: 'Israel', GB: 'United Kingdom', US: 'United States',
+    DE: 'Germany', FR: 'France', CA: 'Canada', AU: 'Australia',
+    NL: 'Netherlands', ES: 'Spain', IT: 'Italy', PL: 'Poland',
+    BR: 'Brazil', MX: 'Mexico', IN: 'India', JP: 'Japan'
+  };
+
+  /* ── Exhaustive smart-suggestion extraction ───────────
+     Pulls every applicable sublabel chip from a position object.
+     Returns an array of SUBLABEL_OPTIONS entries (values the chip
+     pool already knows how to render).                             */
+  function extractSuggestions(pos) {
+    if (!pos) return [];
+    var out = [];
+    var add = function (v) {
+      if (v && SUBLABEL_OPTIONS.indexOf(v) !== -1 && out.indexOf(v) === -1) {
+        out.push(v);
+      }
+    };
+
+    var wt    = (pos.workplaceType   || '').toLowerCase();
+    var et    = (pos.employmentType  || '').toLowerCase();
+    var title = (pos.rawName || pos.title || '').toLowerCase();
+    var dept  = (pos.department      || '').toLowerCase();
+    var country = pos.country || '';
+
+    if (/remote/.test(wt))  add('Remote *');
+    if (/hybrid/.test(wt))  add('Hybrid *');
+
+    if (country === 'GB') add('UK Based *');
+    if (country === 'US') add('US Based *');
+    if (country === 'IL') add('Israel Based *');
+
+    if (/part.time/.test(et)) add('Part Time *');
+
+    if (/maternity/.test(title)) add('Maternity Leave Cover *');
+
+    if (/tebex/.test(dept)       || /tebex/.test(title))       add('Tebex');
+    if (/outplayed/.test(dept)   || /outplayed/.test(title))   add('Outplayed');
+    if (/curseforge/.test(dept)  || /curseforge/.test(title))  add('CurseForge');
+    if (/overwolf ads/.test(dept) || /overwolf ads/.test(title) ||
+        /\bads\b/.test(dept)) add('Overwolf Ads');
+
+    if (pos.isRemote) add('Remote *');
+
+    return out;
+  }
 
   /* ── DOM refs ───────────────────────────────────────────── */
   var $ = function (id) { return document.getElementById(id); };
@@ -218,6 +269,7 @@
     state.smartSuggestions = [];
     CANVAS.resetSeeds();
     syncReferralNudge();
+    renderPositionDetail(null);
 
     setAccent(key);
     syncBrandGrid();
@@ -376,6 +428,7 @@
     state.messagePosition = '';
     state.positionRef     = null;
     syncReferralNudge();
+    renderPositionDetail(null);
     var posGrid = $('pos-grid');
     if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
       el.classList.remove('selected');
@@ -447,7 +500,6 @@
 
   function syncSubLabelUI() {
     if (!elSubChips) return;
-    var accent = BRANDS[state.brand] ? BRANDS[state.brand].accent : '#D34037';
     elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
       var v = el.dataset.value;
       if (v === '__other__') {
@@ -458,12 +510,29 @@
       el.classList.toggle('selected', state.subLabel.indexOf(v) !== -1);
       el.classList.toggle('smart', state.smartSuggestions.indexOf(v) !== -1);
     });
-    // Toggle the Smart Suggestions header visibility
-    var ssHeader = document.getElementById('sublabel-smart-header');
-    if (ssHeader) {
-      ssHeader.style.display = state.smartSuggestions.length ? '' : 'none';
-      ssHeader.style.color = accent;
-    }
+    renderSmartBox();
+  }
+
+  // Populate the dedicated Smart Suggestions box. Each chip is a clone of
+  // the same visual chip used in the full pool; clicking either syncs to
+  // the shared state.subLabel array, so deselecting from either location
+  // works identically.
+  function renderSmartBox() {
+    var box  = document.getElementById('sublabel-smart-box');
+    var host = document.getElementById('sublabel-smart-chips');
+    if (!box || !host) return;
+    if (!state.smartSuggestions.length) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    host.innerHTML = '';
+    state.smartSuggestions.forEach(function (text) {
+      var chip = document.createElement('div');
+      chip.className = 'sublabel-chip smart';
+      if (state.subLabel.indexOf(text) !== -1) chip.classList.add('selected');
+      chip.dataset.value = text;
+      chip.textContent = text;
+      chip.addEventListener('click', function () { onSubLabelSelect(text); });
+      host.appendChild(chip);
+    });
   }
 
   function onSubLabelSelect(value) {
@@ -620,6 +689,7 @@
     state.subLabel        = [];
     state.smartSuggestions = [];
     syncReferralNudge();
+    renderPositionDetail(null);
     CANVAS.resetSeeds();
     setAccent(null);
 
@@ -677,9 +747,12 @@
     _resultMap.png916 = { blob: _resultBlobs.png916, mime: 'image/png',  name: base + '-9x16.png' };
     if (_resultBlobs.videoResult && _resultBlobs.videoResult.blob) {
       var ext = _resultBlobs.videoResult.ext || 'mp4';
+      // navigator.share is picky — use canonical top-level MIME ('video/mp4'
+      // or 'video/webm'), never the codec-qualified variant ('video/mp4;codecs=avc1').
+      var mime = (ext === 'webm') ? 'video/webm' : 'video/mp4';
       _resultMap.video916 = {
         blob: _resultBlobs.videoResult.blob,
-        mime: _resultBlobs.videoResult.blob.type || ('video/' + ext),
+        mime: mime,
         name: base + '-9x16.' + ext,
         ext:  ext
       };
@@ -704,10 +777,14 @@
   // Returns true if the browser natively supports sharing files (mobile Chrome,
   // Safari iOS 15+). On desktop, navigator.share may exist but canShare({files})
   // returns false — in that case we fall back to plain download.
+  //
+  // Lightweight probe is used ONLY for UI toggling (share label vs download label).
+  // The actual navigator.share call in shareFile() re-checks canShare with the
+  // real File object, which is the only reliable pre-flight check.
   function canNativeShareFiles() {
     try {
       if (!navigator.share || !navigator.canShare) return false;
-      var probe = new File([''], 'probe.gif', { type: 'image/gif' });
+      var probe = new File([''], 'probe.png', { type: 'image/png' });
       return !!navigator.canShare({ files: [probe] });
     } catch (_) { return false; }
   }
@@ -726,22 +803,35 @@
     return lines.join('\n');
   }
 
+  // CRITICAL: this function must be reachable synchronously from the click
+  // handler. navigator.share() requires the active user-activation token —
+  // any async awaits between the user gesture and the share call will
+  // invalidate the token on iOS/Safari. Blobs are pre-rendered during the
+  // Generate Package phase and cached on _resultMap so this is sync.
   function shareFile(fmt) {
     var entry = _resultMap[fmt];
-    if (!entry) return;
+    if (!entry || !entry.blob) return;
     var file = new File([entry.blob], entry.name, { type: entry.mime });
-    if (canNativeShareFiles()) {
+
+    // Check canShare with the actual File object — the generic probe lies
+    // on some browsers (notably Android Chrome) that reject video files
+    // based on size/duration but accept empty probes.
+    var shareOk = navigator.share
+      && navigator.canShare
+      && navigator.canShare({ files: [file] });
+
+    if (shareOk) {
+      var text = shareCaption();
       navigator.share({
         files: [file],
         title: positionHeadline(),
-        text:  shareCaption()
+        text:  text
       }).catch(function (err) {
-        if (err && err.name === 'AbortError') return;
-        console.warn('[share] failed, falling back to download:', err);
+        if (err && err.name === 'AbortError') return;   // user cancelled
+        console.warn('[share] navigator.share failed:', err);
         EXPORT.downloadBlob(entry.blob, entry.name);
       });
     } else {
-      // Desktop fallback: just download the file. Caption shown separately.
       EXPORT.downloadBlob(entry.blob, entry.name);
     }
   }
@@ -1034,36 +1124,61 @@
     state.messagePosition = pos.title;
     state.positionRef     = pos;
     syncReferralNudge();
+    renderPositionDetail(pos);
 
     var grid = $('pos-grid');
     if (grid) grid.querySelectorAll('.pos-chip').forEach(function (el) {
       el.classList.toggle('selected', el.dataset.title === pos.title);
     });
 
-    // sublabelHint (from title suffix) takes priority; fall back to workplaceType
-    var mapped = pos.sublabelHint || '';
-    if (!mapped) {
-      var wt = pos.workplaceType || '';
-      if (/hybrid/i.test(wt))      mapped = 'Hybrid *';
-      else if (/remote/i.test(wt)) mapped = 'Remote *';
-    }
-    // Clear any previous auto-suggestions, then re-seed from this position.
-    // We only clear the entries that were auto-added last time — any chips
-    // the user selected manually stay put.
+    // Clear previous auto-suggestions (user-picked chips stay put), then
+    // re-seed from the exhaustive extractSuggestions output.
     state.smartSuggestions.forEach(function (v) {
       var i = state.subLabel.indexOf(v);
       if (i !== -1) state.subLabel.splice(i, 1);
     });
     state.smartSuggestions = [];
-    if (mapped && SUBLABEL_OPTIONS.indexOf(mapped) !== -1) {
-      if (state.subLabel.indexOf(mapped) === -1) state.subLabel.push(mapped);
-      state.smartSuggestions.push(mapped);
-    }
+    var suggestions = extractSuggestions(pos);
+    suggestions.forEach(function (v) {
+      if (state.subLabel.indexOf(v) === -1) state.subLabel.push(v);
+      if (state.smartSuggestions.indexOf(v) === -1) state.smartSuggestions.push(v);
+    });
     syncSubLabelUI();
 
     renderWizard();
     advance();
     scheduleRender();
+  }
+
+  // Renders the compact detail strip of structured fields below the grid
+  // (location, department, employment type, experience level, workplace).
+  function renderPositionDetail(pos) {
+    var el = $('pos-detail');
+    if (!el) return;
+    if (!pos) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    var items = [];
+    var locBits = [];
+    if (pos.city) locBits.push(pos.city);
+    var country = pos.country && COUNTRY_NAMES[pos.country] ? COUNTRY_NAMES[pos.country] : pos.country;
+    if (country) locBits.push(country);
+    if (locBits.length) items.push({ icon: '📍', value: locBits.join(', ') });
+
+    if (pos.isRemote)        items.push({ icon: '🌍', value: 'Open to remote' });
+    if (pos.department)      items.push({ icon: '🏢', value: pos.department });
+    if (pos.employmentType)  items.push({ icon: '⏳', value: pos.employmentType });
+    if (pos.experienceLevel) items.push({ icon: '👤', value: pos.experienceLevel });
+    if (pos.workplaceType)   items.push({ icon: '🌐', value: pos.workplaceType });
+
+    if (!items.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    el.innerHTML = items.map(function (it) {
+      return '<span class="pos-detail-item">' +
+             '<span class="pos-detail-icon">' + it.icon + '</span>' +
+             '<span class="pos-detail-value">' + escapeHtml(it.value) + '</span>' +
+             '</span>';
+    }).join('');
+    el.style.display = '';
   }
 
   /* ═══════════════════════════════════════════════════════

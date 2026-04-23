@@ -8,18 +8,6 @@
 
 const EXPORT = (function () {
 
-  /* ── Headline fade helper ─────────────────────────────
-     Ease-out cubic over the first 25% of the loop.  Returns
-     { msgOpacity, msgYOffset }.  Headline starts invisible and
-     12 px below its final y, slides into place as opacity fills. */
-  function headlineFade(t, loopDuration) {
-    var fadeDuration = loopDuration * 0.25;
-    if (t >= fadeDuration) return { msgOpacity: 1, msgYOffset: 0 };
-    var u = t / fadeDuration;                 // 0 → 1
-    var eased = 1 - Math.pow(1 - u, 3);        // ease-out cubic
-    return { msgOpacity: eased, msgYOffset: 12 * (1 - eased) };
-  }
-
   /* ── CTA heartbeat helper ─────────────────────────────
      One pulse per 3-sec interval, 0.8 s window, sine ease-in-out.
      Returns a 0..1 intensity consumed by canvas.drawText.
@@ -39,38 +27,47 @@ const EXPORT = (function () {
 
   /* ── GIF frame state ─────────────────────────────────── */
   // 45 frames @ 15 fps = 3 s loop, seamlessly modulo-wrapped.
+  // Headline stays fully opaque in every recorded frame — the fade-in
+  // was previously baked into the loop which caused the headline to
+  // flash-out once per iteration. The loop now only contains the
+  // settled, steady state (smoke drift + CTA pulse).
   function gifFrameState(f) {
     var LOOP = 3.0;
     var t = f / 15;
-    var fade = headlineFade(t, LOOP);
     return {
-      msgOpacity: fade.msgOpacity,
-      msgYOffset: fade.msgYOffset,
-      ctaPulse:   ctaHeartbeat(t, LOOP),
-      t:          t
+      msgOpacity:  1,
+      msgYOffset:  0,
+      ctaPulse:    ctaHeartbeat(t, LOOP),
+      t:           t,
+      loopSeconds: LOOP
     };
   }
 
   /* ── MP4 frame state ─────────────────────────────────── */
-  // 10 s loop @ 30 fps
+  // 10 s loop @ 30 fps — same steady-state rule as GIF.
   function mp4FrameState(frame, fps) {
     var LOOP = 10.0;
     var t = frame / fps;
-    var fade = headlineFade(t, LOOP);
     return {
-      msgOpacity: fade.msgOpacity,
-      msgYOffset: fade.msgYOffset,
-      ctaPulse:   ctaHeartbeat(t, LOOP),
-      t:          t
+      msgOpacity:  1,
+      msgYOffset:  0,
+      ctaPulse:    ctaHeartbeat(t, LOOP),
+      t:           t,
+      loopSeconds: LOOP
     };
   }
 
   /* ── Static PNG frame state ──────────────────────────
-     Frame 20 of the 45-frame GIF loop — past the headline fade-in,
-     before the late-loop CTA pulse.  Yields the most visually
-     complete still (headline fully visible, CTA at rest).           */
+     Static still — headline fully visible, CTA at rest, smoke at a
+     settled mid-loop position.  No loopSeconds → smoke uses continuous
+     motion at t=1.33s which is visually equivalent to mid-loop.    */
   function stillFrameState() {
-    return gifFrameState(20);
+    return {
+      msgOpacity: 1,
+      msgYOffset: 0,
+      ctaPulse:   0,
+      t:          1.333
+    };
   }
 
   /* ── PNG: capture single canvas frame ───────────────── */
