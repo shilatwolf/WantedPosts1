@@ -22,7 +22,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const BRANDS      = ['overwolf', 'tebex', 'outplayed'];
+const BRANDS      = ['overwolf', 'tebex', 'outplayed', 'overwolfads', 'curseforge'];
 const IMAGE_EXTS  = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
 const OUTPUT_FILE = path.join(__dirname, 'images-data.js');
 const INDEX_HTML  = path.join(__dirname, 'index.html');

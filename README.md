@@ -50,6 +50,39 @@ Push to `main` → live in ~30 seconds.
 
 ---
 
+## Brand roster
+
+| Key           | Name          | Image pool     | Notes                                       |
+| ------------- | ------------- | -------------- | ------------------------------------------- |
+| `overwolf`    | Overwolf      | `overwolf`     | Shows positions from **all** brands in Step 3 |
+| `tebex`       | Tebex         | `tebex`        |                                             |
+| `outplayed`   | Outplayed     | `outplayed`    |                                             |
+| `overwolfads` | Overwolf Ads  | `overwolf`     | **Shares** the Overwolf image pool          |
+| `curseforge`  | CurseForge    | `curseforge`   | Own image pool                              |
+
+Overwolf Ads reuses the Overwolf image library intentionally — no separate
+`Assets/images/overwolfads/` folder is needed (the `.gitkeep` is there just to
+keep the directory visible in git). CurseForge has its own pool under
+`Assets/images/curseforge/`.
+
+---
+
+## Step 3 — Multi-note behaviour
+
+The note chips under Step 4 ("Add a note") are **multi-select**. Click any
+number of chips and they'll all render on the exported banner, joined with a
+`·` (middle dot) separator. Click again to deselect. The "Other…" chip still
+lets you type a free-form note that's appended to the list.
+
+When a position is selected in Step 3, the tool auto-selects any note that
+matches its `sublabelHint` / `workplaceType` (e.g. Remote, Hybrid). Those
+auto-selected chips are badged with a `✦` marker and a "Smart Suggestions"
+header appears above the full chip pool so it's clear the pre-selection is
+intentional. You can deselect a suggestion and pick different ones — the
+suggestion is just a starting point.
+
+---
+
 ## Adding a new brand
 
 1. **Add to `brands.js`** under `BRANDS`:
@@ -150,7 +183,9 @@ recruitment-banner-generator/
     └── images/
         ├── overwolf/
         ├── tebex/
-        └── outplayed/
+        ├── outplayed/
+        ├── overwolfads/   ← empty; Overwolf Ads reads from the overwolf pool
+        └── curseforge/
 ```
 
 ---

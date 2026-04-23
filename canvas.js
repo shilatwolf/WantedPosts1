@@ -255,110 +255,152 @@ const CANVAS = (function () {
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
-  /* ── Smoke & ember seed generation ────────────────────── */
+  /* ── 4-layer particle seed generation ─────────────────────
+     Layers are independent pools with their own speed, density, and
+     size distributions.  All positions are seeded at init and advanced
+     deterministically (y wraps via modulo), guaranteeing a seamless
+     loop at any duration.                                             */
   function genSeeds(w, h, seed) {
     var r = mkRng(seed);
-    var wisps = [], dots = [];
 
-    // Smoke wisps — weighted toward bottom 50%
-    for (var i = 0; i < 28; i++) {
-      wisps.push({
+    // Speeds are stored as px/second.  Spec numbers are px/frame at
+    // ~30 fps reference, so × 30 to get px/s.
+    var deepSmoke = [];    // large, slow, dark
+    var midSmoke  = [];    // medium wisps with sine drift
+    var fineDots  = [];    // small grey particles
+    var embers    = [];    // brand-accent sparks
+
+    for (var i = 0; i < 12; i++) {
+      deepSmoke.push({
         x:   r() * w,
-        y:   h * 0.5 + r() * h * 0.5,
-        rad: 80 + r() * 180,
-        op:  0.05 + r() * 0.06,
-        spd: 0.35 + r() * 0.30
+        y:   h * 0.6 + r() * h * 0.4,   // weighted to bottom 40%
+        rad: 40 + r() * 40,
+        op:  0.03 + r() * 0.03,
+        spd: 6 + r() * 3                // px/s (0.2–0.3 @ 30fps)
       });
     }
-    // Extra thin wisps spread across canvas
-    for (var j = 0; j < 12; j++) {
-      wisps.push({
-        x:   r() * w,
-        y:   r() * h,
-        rad: 50 + r() * 80,
-        op:  0.02 + r() * 0.025,
-        spd: 0.20 + r() * 0.20
+    for (var j = 0; j < 18; j++) {
+      midSmoke.push({
+        xBase: r() * w,
+        y:     r() * h,
+        rad:   20 + r() * 25,
+        op:    0.02 + r() * 0.02,
+        spd:   12 + r() * 6,
+        phase: r() * Math.PI * 2
       });
     }
-
-    // Ember particles — denser and more visible than before
-    // ~2× more particles, 30% are "bright" embers
-    var nDots = Math.round((w * h) / 5500);
-    for (var k = 0; k < nDots; k++) {
-      var bias     = r();
-      var isBright = r() < 0.30;
-      dots.push({
+    // Scale particle counts with canvas area so 9:16 isn't sparse
+    var areaScale = (w * h) / (1080 * 1080);
+    var nFine = Math.round(30 * areaScale);
+    for (var k = 0; k < nFine; k++) {
+      var bottomBias = r() < 0.75;
+      fineDots.push({
+        x:   r() * w,
+        y:   bottomBias ? (h * 0.4 + r() * h * 0.6) : r() * h,
+        rad: 1 + r() * 1.5,
+        op:  0.05 + r() * 0.10,
+        spd: 18 + r() * 12
+      });
+    }
+    var nEmbers = Math.round(8 * areaScale);
+    for (var m = 0; m < nEmbers; m++) {
+      embers.push({
         x:            r() * w,
-        y:            bias < 0.70 ? (h * 0.5 + r() * h * 0.5) : r() * h,
-        r:            isBright ? (1.5 + r() * 2.0) : (0.7 + r() * 1.3),
-        op:           isBright ? (0.50 + r() * 0.35) : (0.07 + r() * 0.10),
-        spd:          0.38 + r() * 0.58,
+        y:            h * 0.3 + r() * h * 0.7,
+        rad:          0.8 + r() * 0.7,
+        op:           0.06 + r() * 0.06,
+        spd:          24 + r() * 18,
         flickerPhase: r() * Math.PI * 2
       });
     }
 
-    return { wisps: wisps, dots: dots };
+    return {
+      deepSmoke: deepSmoke,
+      midSmoke:  midSmoke,
+      fineDots:  fineDots,
+      embers:    embers
+    };
   }
 
-  /* ── Smoke & ember rendering ───────────────────────────── */
-  // t = elapsed time in SECONDS — frame-rate independent.
-  // At 15 fps: t = frame/15.  At 30 fps: t = frame/30.
-  // Drift speed ~15 px/s; flicker ~0.9 Hz (gentle, ambient).
+  /* ── 4-layer particle rendering ─────────────────────────
+     t = elapsed seconds. y wraps via modulo so frame 0 and the last
+     frame match exactly — guaranteed seamless loop.
+
+     yFade multiplier fades every layer toward the top of the canvas,
+     keeping the headline area clean.  Bottom 40% is fully opaque;
+     the top third is nearly invisible.                              */
   function drawSmoke(ctx, w, h, seeds, t, emberColor) {
     ctx.save();
     t = t || 0;
-    var DRIFT = 15; // px per second of drift
 
-    // ── Smoke wisps (dark, always) ──────────────────────
-    seeds.wisps.forEach(function (ws) {
-      var drift = t * ws.spd * DRIFT;
-      var y = ((ws.y - drift) % (h + ws.rad * 2) + h + ws.rad * 2) % (h + ws.rad * 2) - ws.rad;
-      var g = ctx.createRadialGradient(ws.x, y, 0, ws.x, y, ws.rad);
-      g.addColorStop(0,   'rgba(18,18,18,' + (ws.op * 3.0).toFixed(4) + ')');
-      g.addColorStop(0.5, 'rgba(10,10,10,' + (ws.op * 1.5).toFixed(4) + ')');
-      g.addColorStop(1,   'rgba(0,0,0,0)');
+    function wrapY(y, extent) {
+      var span = h + extent * 2;
+      return ((y - extent) % span + span) % span - extent;
+    }
+    function yFadeAt(y) {
+      return Math.min(1, y / (h * 0.6));
+    }
+
+    // ── Layer 1: deep smoke (dark radial gradients) ─────
+    seeds.deepSmoke.forEach(function (p) {
+      var drift = t * p.spd;
+      var y = wrapY(p.y - drift, p.rad);
+      var fade = yFadeAt(y);
+      if (fade <= 0) return;
+      var a = (p.op * fade).toFixed(4);
+      var g = ctx.createRadialGradient(p.x, y, 0, p.x, y, p.rad);
+      g.addColorStop(0, 'rgba(10,10,10,' + a + ')');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(ws.x, y, ws.rad, 0, Math.PI * 2);
+      ctx.arc(p.x, y, p.rad, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // ── Ember particles ─────────────────────────────────
+    // ── Layer 2: mid smoke (smaller wisps + sine drift) ─
+    seeds.midSmoke.forEach(function (p) {
+      var drift = t * p.spd;
+      var y = wrapY(p.y - drift, p.rad);
+      var x = p.xBase + Math.sin(y * 0.015 + p.phase) * 12;
+      var fade = yFadeAt(y);
+      if (fade <= 0) return;
+      var a = (p.op * fade).toFixed(4);
+      var g = ctx.createRadialGradient(x, y, 0, x, y, p.rad);
+      g.addColorStop(0, 'rgba(14,14,14,' + a + ')');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, p.rad, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // ── Layer 3: fine particles (small grey dots) ───────
+    seeds.fineDots.forEach(function (p) {
+      var drift = t * p.spd;
+      var y = wrapY(p.y - drift, 6);
+      var fade = yFadeAt(y);
+      if (fade <= 0) return;
+      var a = Math.min(1, p.op * fade).toFixed(4);
+      ctx.beginPath();
+      ctx.arc(p.x, y, p.rad, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(200,200,200,' + a + ')';
+      ctx.fill();
+    });
+
+    // ── Layer 4: ember sparks (brand accent, brand-gated) ─
     if (emberColor) {
       var rgb = hexToRGB(emberColor);
-      seeds.dots.forEach(function (d) {
-        var drift = t * d.spd * DRIFT;
-        var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
-        // Flicker at ~0.9 Hz — ambient, not flashy. Frame-rate independent.
-        var flicker = 0.55 + 0.45 * Math.sin(t * Math.PI * 2 * 0.9 + d.flickerPhase);
-        var alpha   = Math.min(1, d.op * flicker);
-
-        // Core dot
+      seeds.embers.forEach(function (p) {
+        var drift = t * p.spd;
+        var y = wrapY(p.y - drift, 4);
+        var fade = yFadeAt(y);
+        if (fade <= 0) return;
+        // Gentle flicker — frame-rate independent, seamless across loops
+        var flicker = 0.65 + 0.35 * Math.sin(t * Math.PI * 2 * 0.9 + p.flickerPhase);
+        var alpha   = Math.min(1, p.op * fade * flicker);
         ctx.beginPath();
-        ctx.arc(d.x, y, d.r, 0, Math.PI * 2);
+        ctx.arc(p.x, y, p.rad, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha.toFixed(4) + ')';
-        ctx.fill();
-
-        // Glow halo on bright embers
-        if (d.op > 0.40) {
-          var glowR = d.r * 3.5;
-          var g2    = ctx.createRadialGradient(d.x, y, 0, d.x, y, glowR);
-          g2.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + (alpha * 0.35).toFixed(4) + ')');
-          g2.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
-          ctx.beginPath();
-          ctx.arc(d.x, y, glowR, 0, Math.PI * 2);
-          ctx.fillStyle = g2;
-          ctx.fill();
-        }
-      });
-    } else {
-      // Tebex: very subtle neutral dust only
-      seeds.dots.forEach(function (d) {
-        var drift = t * d.spd * DRIFT;
-        var y = ((d.y - drift) % (h + 10) + h + 10) % (h + 10) - 5;
-        ctx.beginPath();
-        ctx.arc(d.x, y, d.r * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(180,180,180,' + (d.op * 0.25).toFixed(4) + ')';
         ctx.fill();
       });
     }
@@ -468,6 +510,7 @@ const CANVAS = (function () {
   function drawText(ctx, zones, brand, msg, cta, subLabel, is916, fstate) {
     var BF = "'Montserrat', sans-serif";
     var msgOpacity = (fstate && fstate.msgOpacity !== undefined) ? fstate.msgOpacity : 1;
+    var msgYOffset = (fstate && fstate.msgYOffset !== undefined) ? fstate.msgYOffset : 0;
     var ctaPulse   = (fstate && fstate.ctaPulse   !== undefined) ? fstate.ctaPulse   : 0;
 
     var tz = zones.title;
@@ -480,7 +523,7 @@ const CANVAS = (function () {
     var lines  = fit.lines;
     var lineH  = sz * 1.25;
     var totalH = lines.length * lineH;
-    var startY = tz.y + (tz.h - totalH) / 2 + lineH / 2;
+    var startY = tz.y + (tz.h - totalH) / 2 + lineH / 2 + msgYOffset;
 
     var anchorX = tz.al === 'left'   ? tz.x :
                   tz.al === 'right'  ? tz.x + tz.w :
@@ -501,6 +544,9 @@ const CANVAS = (function () {
     });
     ctx.restore();
 
+    // Bottom edge of the last text line (textBaseline = 'middle', so add sz/2)
+    var textBottom = startY + (lines.length - 1) * lineH + sz / 2;
+
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
       var ctaText  = cta.toUpperCase();               // always CAPS
@@ -516,30 +562,25 @@ const CANVAS = (function () {
       var bx = cz.al === 'left'   ? cz.x :
                cz.al === 'right'  ? cz.x + cz.w - btnW :
                                      cz.x + (cz.w - btnW) / 2;
-      var by = cz.y + (cz.h - btnH) / 2;
 
-      // Pulse: smooth scale + accent glow
-      var scale = 1 + ctaPulse * 0.07;
+      // Fixed gap below last text line — same regardless of title length or font size
+      var ctaGap = is916 ? 60 : 44;
+      var by = textBottom + ctaGap;
+
+      // Heartbeat pulse — subtle scale (1 → 1.04 → 1) + brightness mix.
+      // No glow, no shadow; keeps the CTA clean and brand-accurate.
+      var scale = 1 + 0.04 * ctaPulse;
       ctx.translate(bx + btnW / 2, by + btnH / 2);
       ctx.scale(scale, scale);
 
-      // Glow layer
-      if (ctaPulse > 0.15) {
-        var glowSize  = ctaPulse * 28;
-        var rgb       = hexToRGB(brand.accent);
-        var glowAlpha = ctaPulse * 0.55;
-        var g = ctx.createRadialGradient(0, 0, 0, 0, 0, btnW * 0.8);
-        g.addColorStop(0, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + glowAlpha.toFixed(3) + ')');
-        g.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
-        ctx.beginPath();
-        ctx.rect(-btnW / 2 - glowSize, -btnH / 2 - glowSize,
-                 btnW + glowSize * 2, btnH + glowSize * 2);
-        ctx.fillStyle = g;
-        ctx.fill();
-      }
+      // Mix brand accent with white at up to 12% at the pulse peak.
+      var accRgb = hexToRGB(brand.accent);
+      var mix    = 0.12 * ctaPulse;
+      var pr = Math.round(accRgb.r + (255 - accRgb.r) * mix);
+      var pg = Math.round(accRgb.g + (255 - accRgb.g) * mix);
+      var pb = Math.round(accRgb.b + (255 - accRgb.b) * mix);
 
-      // Button fill
-      ctx.fillStyle = brand.accent;
+      ctx.fillStyle = 'rgb(' + pr + ',' + pg + ',' + pb + ')';
       ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
 
       // Button text — Montserrat Bold CAPS
@@ -553,21 +594,25 @@ const CANVAS = (function () {
       ctx.restore();
 
       // ── Sub-label below button (optional) ─────────────
+      // Multi-note line joined with '·'.  Auto-shrinks to fit the CTA zone
+      // width if the combined string is too long, matching the headline.
       if (subLabel && subLabel.trim()) {
+        var subMaxW  = cz.w;
         var subFontSz = is916 ? 22 : 17;
+        var SUB_MIN  = is916 ? 14 : 11;
         ctx.save();
-        ctx.font         = '300 ' + subFontSz + 'px ' + BF;  // Montserrat Light
+        ctx.font = '300 ' + subFontSz + 'px ' + BF;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
+        while (subFontSz > SUB_MIN && ctx.measureText(subLabel.toUpperCase()).width > subMaxW) {
+          subFontSz -= 1;
+          ctx.font = '300 ' + subFontSz + 'px ' + BF;
+        }
         ctx.fillStyle    = 'rgba(255,255,255,0.65)';
         ctx.textAlign    = cz.al === 'center' ? 'center' : 'left';
         ctx.textBaseline = 'top';
         ctx.shadowColor  = 'rgba(0,0,0,0.9)';
         ctx.shadowBlur   = 6;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
         var subX = cz.al === 'center' ? (cz.x + cz.w / 2) : cz.x;
-        // Gap below button = same visual weight as the gap above button from title zone bottom.
-        // Title zone bottom → button top is (cz.y + (cz.h-btnH)/2) - titBot,
-        // which works out to roughly btnH/2 worth of zone padding.
-        // Matching that: gap = half the button height keeps it balanced.
         var subGap = Math.round(btnH * 0.45);
         var subY = by + btnH + subGap;
         ctx.fillText(subLabel.toUpperCase(), subX, subY);
@@ -605,7 +650,12 @@ const CANVAS = (function () {
     var lay      = 'left';   // layout step removed — always left-aligned
     var msg      = state.messageMode === 'preset' ? state.messagePreset : state.messagePosition;
     var cta      = state.cta;
-    var subLabel = state.subLabel || '';
+    // subLabel is an array of selected notes (multi-select). Join with a
+    // middle dot for canvas rendering. Legacy string values are tolerated.
+    var subLabelArr = Array.isArray(state.subLabel)
+      ? state.subLabel.filter(function (s) { return s && String(s).trim(); })
+      : (state.subLabel ? [state.subLabel] : []);
+    var subLabel = subLabelArr.join(' · ');
 
     // Use the correct format image for each output size
     var imgSrc = is916

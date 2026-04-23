@@ -12,7 +12,8 @@
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "WebFetch(domain:www.comeet.co)",
       "WebSearch",
-      "WebFetch(domain:developers.comeet.com)"
+      "WebFetch(domain:developers.comeet.com)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

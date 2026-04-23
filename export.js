@@ -8,26 +8,69 @@
 
 const EXPORT = (function () {
 
+  /* ── Headline fade helper ─────────────────────────────
+     Ease-out cubic over the first 25% of the loop.  Returns
+     { msgOpacity, msgYOffset }.  Headline starts invisible and
+     12 px below its final y, slides into place as opacity fills. */
+  function headlineFade(t, loopDuration) {
+    var fadeDuration = loopDuration * 0.25;
+    if (t >= fadeDuration) return { msgOpacity: 1, msgYOffset: 0 };
+    var u = t / fadeDuration;                 // 0 → 1
+    var eased = 1 - Math.pow(1 - u, 3);        // ease-out cubic
+    return { msgOpacity: eased, msgYOffset: 12 * (1 - eased) };
+  }
+
+  /* ── CTA heartbeat helper ─────────────────────────────
+     One pulse per 3-sec interval, 0.8 s window, sine ease-in-out.
+     Returns a 0..1 intensity consumed by canvas.drawText.
+     GIF (3 s loop) → one pulse per loop.
+     MP4 (10 s loop) → pulses at 3 s, 6 s, 9 s.                     */
+  function ctaHeartbeat(t, loopDuration) {
+    var pulseDuration = 0.8;
+    var pulseStart = loopDuration >= 8 ? 3.0 : (loopDuration * 0.6);
+    var pulseInterval = loopDuration >= 8 ? 3.0 : loopDuration;
+    var n = Math.floor((t - pulseStart) / pulseInterval);
+    if (n < 0) return 0;
+    var pulseAt = pulseStart + n * pulseInterval;
+    if (t < pulseAt || t >= pulseAt + pulseDuration) return 0;
+    var u = (t - pulseAt) / pulseDuration;
+    return Math.sin(u * Math.PI);              // 0 → 1 → 0
+  }
+
   /* ── GIF frame state ─────────────────────────────────── */
-  // 45 frames @ 15 fps = 3 s loop
-  // F 0-9  : headline fades in fast
-  // All:    embers drift up, CTA pulses continuously
+  // 45 frames @ 15 fps = 3 s loop, seamlessly modulo-wrapped.
   function gifFrameState(f) {
-    var msgOpacity = 1;
-    var ctaPulse = (Math.sin(f * (Math.PI * 2 / 15)) * 0.5 + 0.5);
-    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse, t: f / 15 };
+    var LOOP = 3.0;
+    var t = f / 15;
+    var fade = headlineFade(t, LOOP);
+    return {
+      msgOpacity: fade.msgOpacity,
+      msgYOffset: fade.msgYOffset,
+      ctaPulse:   ctaHeartbeat(t, LOOP),
+      t:          t
+    };
   }
 
   /* ── MP4 frame state ─────────────────────────────────── */
   // 10 s loop @ 30 fps
   function mp4FrameState(frame, fps) {
+    var LOOP = 10.0;
     var t = frame / fps;
-    var msgOpacity = t < 0.35 ? 0 :
-                     t < 1.1  ? (t - 0.35) / 0.75 :
-                     1;
-    // Continuous pulse matching GIF rhythm
-    var ctaPulse = (Math.sin(t * Math.PI * 2 / 1.0) * 0.5 + 0.5);
-    return { msgOpacity: msgOpacity, ctaPulse: ctaPulse, t: t };
+    var fade = headlineFade(t, LOOP);
+    return {
+      msgOpacity: fade.msgOpacity,
+      msgYOffset: fade.msgYOffset,
+      ctaPulse:   ctaHeartbeat(t, LOOP),
+      t:          t
+    };
+  }
+
+  /* ── Static PNG frame state ──────────────────────────
+     Frame 20 of the 45-frame GIF loop — past the headline fade-in,
+     before the late-loop CTA pulse.  Yields the most visually
+     complete still (headline fully visible, CTA at rest).           */
+  function stillFrameState() {
+    return gifFrameState(20);
   }
 
   /* ── PNG: capture single canvas frame ───────────────── */
@@ -39,7 +82,8 @@ const EXPORT = (function () {
       oc.height = s.h;
       var ctx = oc.getContext('2d');
 
-      CANVAS.renderToCtx(ctx, s, state, 0, { msgOpacity: 1, ctaPulse: 0 }, is916, true)
+      var fs = stillFrameState();
+      CANVAS.renderToCtx(ctx, s, state, 20, fs, is916, true)
         .then(function () {
           oc.toBlob(function (blob) {
             if (blob) resolve(blob);
@@ -63,8 +107,9 @@ const EXPORT = (function () {
       }
 
       var gif = new GIF({
-        workers:      2,
-        quality:      3,          // 1=best, lower = sharper colors (was 8)
+        workers:      4,
+        quality:      8,          // 1=best, 30=worst; 8 balances size vs. fidelity
+        dither:       'FloydSteinberg',
         width:        CANVAS.S11.w,
         height:       CANVAS.S11.h,
         workerScript: (typeof GIF_WORKER_URL !== 'undefined') ? GIF_WORKER_URL : 'gif.worker.js'
@@ -82,7 +127,9 @@ const EXPORT = (function () {
         for (var f = 0; f < FRAMES; f++) {
           var fs = gifFrameState(f);
           await CANVAS.renderToCtx(ctx, CANVAS.S11, state, f, fs, false, true);
-          gif.addFrame(ctx, { copy: true, delay: DELAY });
+          // Slightly longer final-frame delay smooths the loop transition
+          var delay = (f === FRAMES - 1) ? 100 : DELAY;
+          gif.addFrame(ctx, { copy: true, delay: delay });
           if (onProgress) onProgress(f / FRAMES);
         }
         gif.render();
@@ -105,13 +152,15 @@ const EXPORT = (function () {
 
       // MP4 first (native in Chrome 130+, required for Instagram Stories).
       // WebM second — re-encoded to MP4 later by ffmpeg.wasm if available.
+      // videoBitsPerSecond: high bitrate so particle/smoke detail survives
+      // compression (VP9 8 Mbps, VP8/MP4 6 Mbps).
       var candidateList = [
-        { mime: 'video/mp4;codecs=avc1.42E01F', ext: 'mp4' },
-        { mime: 'video/mp4;codecs=avc1',        ext: 'mp4' },
-        { mime: 'video/mp4',                    ext: 'mp4' },
-        { mime: 'video/webm;codecs=vp9',        ext: 'webm' },
-        { mime: 'video/webm;codecs=vp8',        ext: 'webm' },
-        { mime: 'video/webm',                   ext: 'webm' }
+        { mime: 'video/mp4;codecs=avc1.42E01F', ext: 'mp4',  bps: 6000000 },
+        { mime: 'video/mp4;codecs=avc1',        ext: 'mp4',  bps: 6000000 },
+        { mime: 'video/mp4',                    ext: 'mp4',  bps: 6000000 },
+        { mime: 'video/webm;codecs=vp9',        ext: 'webm', bps: 8000000 },
+        { mime: 'video/webm;codecs=vp8',        ext: 'webm', bps: 6000000 },
+        { mime: 'video/webm',                   ext: 'webm', bps: 6000000 }
       ];
 
       var oc  = document.createElement('canvas');
@@ -135,6 +184,16 @@ const EXPORT = (function () {
       if (window.MediaRecorder.isTypeSupported) {
         for (var ci = 0; ci < candidateList.length; ci++) {
           if (MediaRecorder.isTypeSupported(candidateList[ci].mime)) {
+            recorder = tryCreateRecorder({
+              mimeType: candidateList[ci].mime,
+              videoBitsPerSecond: candidateList[ci].bps
+            });
+            if (recorder) {
+              chosenMime = candidateList[ci].mime;
+              chosenExt  = candidateList[ci].ext;
+              break;
+            }
+            // Fallback if bitrate option is rejected on this codec
             recorder = tryCreateRecorder({ mimeType: candidateList[ci].mime });
             if (recorder) {
               chosenMime = candidateList[ci].mime;
@@ -294,6 +353,65 @@ const EXPORT = (function () {
         .then(function (fh) { return fh.createWritable(); })
         .then(function (w)  { return w.write(f.blob).then(function () { return w.close(); }); });
     }, Promise.resolve());
+  }
+
+  /* ── Generate blobs only (no download, no ZIP) ────────
+     Used by the results screen which previews + shares + downloads
+     each file individually.  Resolves with:
+       { png11, gif11, png916, videoResult: { blob, ext } | null }
+                                                                    */
+  function generateBlobs(state, onProgress) {
+    var step = function (pct, label) {
+      if (onProgress) onProgress(pct, label);
+    };
+    var png11, gif11, png916, videoResult;
+    step(0, 'Rendering 1:1 PNG…');
+    return makePNG(state, false)
+      .then(function (blob) {
+        png11 = blob;
+        step(5, 'Generating 1:1 GIF (45 frames)…');
+        return makeGIF(state, function (f) {
+          step(5 + f * 50, 'Generating GIF… ' + Math.round(f * 100) + '%');
+        });
+      })
+      .then(function (blob) {
+        gif11 = blob;
+        step(56, 'Rendering 9:16 PNG…');
+        return makePNG(state, true);
+      })
+      .then(function (blob) {
+        png916 = blob;
+        step(60, 'Recording 9:16 video (10 s)…');
+        return makeVideo(state, function (p) {
+          step(60 + p * 34, 'Recording video… ' + Math.round(p * 100) + '%');
+        })
+        .catch(function (err) {
+          if (err && /MediaRecorder|not supported|Failed to create MediaRecorder/i.test(err.message || '')) {
+            console.warn('[EXPORT] video export unavailable:', err);
+            return null;
+          }
+          throw err;
+        })
+        .then(function (result) {
+          if (!result || !result.blob) return result;
+          if (result.ext === 'mp4') return result;
+          if (_hasFFmpeg()) {
+            step(94, 'Re-encoding video to MP4…');
+            return _reencodeVideoToMP4(result.blob)
+              .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
+              .catch(function (err) {
+                console.warn('[EXPORT] ffmpeg re-encode failed, keeping webm:', err);
+                return result;
+              });
+          }
+          return result;
+        });
+      })
+      .then(function (result) {
+        videoResult = result;
+        step(100, 'Done!');
+        return { png11: png11, gif11: gif11, png916: png916, videoResult: videoResult };
+      });
   }
 
   /* ── Main export orchestrator ────────────────────────── */
@@ -470,7 +588,10 @@ const EXPORT = (function () {
   }
 
   return {
-    generatePackage: generatePackage
+    generatePackage:  generatePackage,
+    generateBlobs:    generateBlobs,
+    makeZip:          makeZip,
+    downloadBlob:     _fallbackDownload
   };
 
 })();

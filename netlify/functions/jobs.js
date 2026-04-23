@@ -56,12 +56,17 @@ exports.handler = async () => {
       .map(p => {
         const raw = p.name || '';
         return {
-          title:         cleanTitle(raw),
-          department:    p.department || '',
-          location:      [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
-          workplaceType: p.workplace_type || '',
-          sublabelHint:  titleSublabel(raw),   // from title suffix (priority)
-          brand:         deriveBrand(raw),
+          title:          cleanTitle(raw),
+          department:     p.department || '',
+          location:       [p.location && p.location.city, p.workplace_type].filter(Boolean).join(' · '),
+          workplaceType:  p.workplace_type || '',
+          sublabelHint:   titleSublabel(raw),   // from title suffix (priority)
+          brand:          deriveBrand(raw),
+          // Referral bridge (§9) — link to Comeet's page where the employee
+          // authenticates to get a personal ?ref= token.  Reward amount is
+          // surfaced in the nudge if present.
+          urlActivePage:  p.url_active_page || '',
+          referralReward: p.company_referrals_reward || '',
         };
       })
       .sort((a, b) => a.title.localeCompare(b.title));

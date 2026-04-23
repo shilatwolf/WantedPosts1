@@ -14,11 +14,19 @@
     messageMode:     'position',
     messagePreset:   null,
     messagePosition: '',
+    positionRef:     null,   // full position object when a chip is selected
+    referralLink:    '',     // user-pasted https://careers.overwolf.com/career/…?ref=…
     cta:             null,
-    subLabel:        '',     // optional note below CTA button
+    subLabel:        [],     // optional notes below CTA button (multi-select)
+    smartSuggestions:[],     // subset of subLabel that was auto-suggested for the current position
     // internal
     images:          {}
   };
+
+  // Holds the generated blobs after Generate Package completes.
+  // { png11, gif11, png916, videoResult: { blob, ext } | null }
+  var _resultBlobs = null;
+  var _resultVideoMime = '';
 
   var SUBLABEL_OPTIONS = [
     'UK Based *',
@@ -60,9 +68,6 @@
   var elProgressWrap  = $('progress-wrap');
   var elProgressFill  = $('progress-fill');
   var elProgressLabel = $('progress-label');
-  var elSuccessState  = $('success-state');
-  var elExportArea    = $('export-area');
-
   /* ── Accent CSS variables ─────────────────────────────── */
   function setAccent(brand) {
     var b = brand ? BRANDS[brand] : { accent: '#D34037', accentHover: '#F05C48' };
@@ -206,9 +211,13 @@
     state.layout          = 'left';
     state.messagePreset   = null;
     state.messagePosition = '';
+    state.positionRef     = null;
+    state.referralLink    = '';
     state.cta             = null;
-    state.subLabel        = '';
+    state.subLabel        = [];
+    state.smartSuggestions = [];
     CANVAS.resetSeeds();
+    syncReferralNudge();
 
     setAccent(key);
     syncBrandGrid();
@@ -365,6 +374,8 @@
     state.messageMode = mode;
     state.messagePreset   = null;
     state.messagePosition = '';
+    state.positionRef     = null;
+    syncReferralNudge();
     var posGrid = $('pos-grid');
     if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
       el.classList.remove('selected');
@@ -411,7 +422,11 @@
     scheduleRender();
   }
 
-  /* ── Sub-label (optional note below CTA button) ───────── */
+  /* ── Sub-label (optional notes below CTA button, multi-select) ─── */
+  // The "Other…" free-text entry is tracked separately so toggling preset
+  // chips doesn't wipe what the user typed (and vice-versa).
+  var _customSubLabel = '';
+
   function buildSubLabelChips() {
     SUBLABEL_OPTIONS.forEach(function (text) {
       var chip = document.createElement('div');
@@ -421,7 +436,7 @@
       chip.addEventListener('click', function () { onSubLabelSelect(text); });
       elSubChips.appendChild(chip);
     });
-    // "Other" chip
+    // "Other" chip — toggles the free-text input
     var other = document.createElement('div');
     other.className = 'sublabel-chip';
     other.dataset.value = '__other__';
@@ -430,44 +445,67 @@
     elSubChips.appendChild(other);
   }
 
+  function syncSubLabelUI() {
+    if (!elSubChips) return;
+    var accent = BRANDS[state.brand] ? BRANDS[state.brand].accent : '#D34037';
+    elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
+      var v = el.dataset.value;
+      if (v === '__other__') {
+        el.classList.toggle('selected', !!_customSubLabel);
+        el.classList.remove('smart');
+        return;
+      }
+      el.classList.toggle('selected', state.subLabel.indexOf(v) !== -1);
+      el.classList.toggle('smart', state.smartSuggestions.indexOf(v) !== -1);
+    });
+    // Toggle the Smart Suggestions header visibility
+    var ssHeader = document.getElementById('sublabel-smart-header');
+    if (ssHeader) {
+      ssHeader.style.display = state.smartSuggestions.length ? '' : 'none';
+      ssHeader.style.color = accent;
+    }
+  }
+
   function onSubLabelSelect(value) {
     if (value === '__other__') {
-      // Show text input, clear preset selection
-      elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
-        el.classList.toggle('selected', el.dataset.value === '__other__');
-      });
-      elSubOtherWrap.style.display = '';
-      elSubOtherInput.focus();
-      state.subLabel = elSubOtherInput ? elSubOtherInput.value : '';
+      // Toggle the free-text input row. When closing, drop the custom entry.
+      if (_customSubLabel) {
+        // Deselect: remove the custom string from subLabel and clear input.
+        var idx = state.subLabel.indexOf(_customSubLabel);
+        if (idx !== -1) state.subLabel.splice(idx, 1);
+        _customSubLabel = '';
+        if (elSubOtherInput) elSubOtherInput.value = '';
+        elSubOtherWrap.style.display = 'none';
+      } else {
+        elSubOtherWrap.style.display = '';
+        if (elSubOtherInput) elSubOtherInput.focus();
+      }
+      syncSubLabelUI();
       scheduleRender();
       return;
     }
-    // Toggle off if already selected
-    if (state.subLabel === value) {
-      state.subLabel = '';
-      elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
-        el.classList.remove('selected');
-      });
-      elSubOtherWrap.style.display = 'none';
-      scheduleRender();
-      return;
+
+    // Preset chip — toggle in/out of the array
+    var i = state.subLabel.indexOf(value);
+    if (i === -1) {
+      state.subLabel.push(value);
+    } else {
+      state.subLabel.splice(i, 1);
+      // If the user deselects a smart suggestion, drop its "smart" badge too.
+      var si = state.smartSuggestions.indexOf(value);
+      if (si !== -1) state.smartSuggestions.splice(si, 1);
     }
-    state.subLabel = value;
-    elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
-      el.classList.toggle('selected', el.dataset.value === value);
-    });
-    elSubOtherWrap.style.display = 'none';
-    if (elSubOtherInput) elSubOtherInput.value = '';
+    syncSubLabelUI();
     scheduleRender();
   }
 
   function clearSubLabel() {
-    state.subLabel = '';
-    if (elSubChips) elSubChips.querySelectorAll('.sublabel-chip').forEach(function (el) {
-      el.classList.remove('selected');
-    });
+    state.subLabel = [];
+    state.smartSuggestions = [];
+    _customSubLabel = '';
     if (elSubOtherWrap) elSubOtherWrap.style.display = 'none';
     if (elSubOtherInput) elSubOtherInput.value = '';
+    syncSubLabelUI();
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -531,145 +569,41 @@
     if (fn) fn.disabled = !!locked;
   }
 
-  function _runExport(dirHandle) {
+  function _runExport() {
     elBtnExport.style.display    = 'none';
     elProgressWrap.style.display = 'flex';
-    elSuccessState.style.display = 'none';
     setWizardLocked(true);
 
-    var filenameEl = document.getElementById('filename-input');
-    var filename   = sanitizeFilename(filenameEl ? filenameEl.value : 'recruitment-banners');
-
-    EXPORT.generatePackage(
-      state,
-      function (pct, label) {
-        elProgressFill.style.width  = pct + '%';
-        elProgressLabel.textContent = label || '';
-      },
-      function (info) {
+    EXPORT.generateBlobs(state, function (pct, label) {
+      elProgressFill.style.width  = pct + '%';
+      elProgressLabel.textContent = label || '';
+    })
+    .then(function (blobs) {
+      _resultBlobs = blobs;
+      _resultVideoMime = blobs.videoResult ? (blobs.videoResult.blob.type || '') : '';
+      elProgressWrap.style.display = 'none';
+      showResults();
+    })
+    .catch(function (err) {
+      console.error('[EXPORT]', err);
+      setWizardLocked(false);
+      elProgressWrap.style.display = 'flex';
+      elProgressLabel.textContent  = '✗ ' + (err && err.message ? err.message : 'Export failed');
+      elProgressLabel.style.color  = 'var(--terr)';
+      setTimeout(function () {
         elProgressWrap.style.display = 'none';
-
-        var folderSave = info.savedAs === 'folder';
-        var titleText  = folderSave ? 'Files saved to folder!' : 'Package downloaded!';
-        var noteText = '';
-        if (folderSave) {
-          noteText = '<p class="success-note" style="color:var(--tok)">✓ Saved directly — no ZIP, no security warnings.</p>';
-        } else if (info.videoExt === 'webm') {
-          noteText = '<p class="success-note">⚠ Video saved as .webm — rename to .mp4 if needed.</p>';
-        } else if (!info.videoExt) {
-          noteText = '<p class="success-note">⚠ Video export unavailable in this browser; package contains PNG + GIF only.</p>';
-        }
-
-        var fileList = '' +
-          '<div class="success-file">banner-1x1.png <span>'  + info.png11Size  + ' KB</span></div>' +
-          '<div class="success-file">banner-1x1.gif <span>'  + info.gif11Size  + ' KB</span></div>' +
-          '<div class="success-file">banner-9x16.png <span>' + info.png916Size + ' KB</span></div>';
-
-        if (info.videoExt) {
-          fileList += '<div class="success-file">banner-9x16.' + info.videoExt +
-            ' <span class="' + (info.videoExt === 'webm' ? 'webm' : '') + '">' + info.vidSize + ' KB</span></div>';
-        }
-
-        elSuccessState.innerHTML =
-          '<div class="success-header">' +
-            '<div class="success-icon">✓</div>' +
-            '<span class="success-title">' + titleText + '</span>' +
-          '</div>' +
-          '<div class="success-files">' + fileList + '</div>' +
-          noteText +
-          '<div class="success-next-hint">What next?</div>' +
-          '<div class="action-bar action-bar-stack">' +
-            '<button class="btn-p" id="btn-tweak">✎ Make Changes & Export Again</button>' +
-            '<button class="btn-s" id="btn-restart">↩ Start Over</button>' +
-          '</div>';
-
-        elSuccessState.style.display = 'flex';
-        elSuccessState.style.flexDirection = 'column';
-        elSuccessState.style.gap = '12px';
-
-        // Wizard stays LOCKED while success state is showing — the user has
-        // to explicitly pick one of the two next-step buttons.  This avoids
-        // the "half-rendered with stale state" bug and makes the flow crisp.
-        var restartBtn = document.getElementById('btn-restart');
-        if (restartBtn) restartBtn.addEventListener('click', onRestart);
-        var tweakBtn = document.getElementById('btn-tweak');
-        if (tweakBtn) tweakBtn.addEventListener('click', onContinueEditing);
-      },
-      function (errMsg) {
-        setWizardLocked(false);  // always unlock on error so user can retry
-        // '__cancelled__' means the user closed the folder/file picker — restore quietly
-        if (errMsg === '__cancelled__') {
-          elProgressWrap.style.display = 'none';
-          elBtnExport.style.display    = '';
-          return;
-        }
-        elProgressWrap.style.display = 'none';
-        elProgressLabel.textContent  = '✗ ' + errMsg;
-        elProgressLabel.style.color  = 'var(--terr)';
-        elProgressWrap.style.display = 'flex';
-        setTimeout(function () {
-          elProgressWrap.style.display = 'none';
-          elBtnExport.style.display    = '';
-          elProgressLabel.style.color  = '';
-        }, 4000);
-      },
-      filename,
-      dirHandle   // FileSystemDirectoryHandle (or null → ZIP fallback)
-    );
+        elBtnExport.style.display    = '';
+        elProgressLabel.style.color  = '';
+      }, 4000);
+    });
   }
 
   function onExport() {
     if (!allComplete()) return;
-
-    // showDirectoryPicker MUST be called synchronously inside this click
-    // handler while the user-gesture token is still alive.  The rendering
-    // pipeline (PNG + GIF + 10 s video) takes many seconds, so by the time
-    // it finishes the gesture has expired and the browser throws:
-    //   "Must be handling a user gesture to show a file picker."
-    // Solution: call the picker HERE, get the directory handle, then pass
-    // it into generatePackage which uses it after rendering is done.
-    if (window.showDirectoryPicker) {
-      elBtnExport.disabled = true;   // prevent double-click while picker is open
-      window.showDirectoryPicker({ id: 'banner-export', startIn: 'downloads', mode: 'readwrite' })
-        .then(function (dirHandle) {
-          elBtnExport.disabled = false;
-          // Lock the wizard the moment the user commits to this export.
-          // This stops them from tweaking selections during "Preparing…" or
-          // the render itself — mid-render changes produce garbled output.
-          setWizardLocked(true);
-          elProgressWrap.style.display = 'flex';
-          elProgressLabel.textContent  = 'Preparing image data…';
-          _imageDataReady.then(function () { _runExport(dirHandle); });
-        })
-        .catch(function (err) {
-          elBtnExport.disabled = false;
-          if (err && err.name === 'AbortError') return; // user closed picker — do nothing
-          console.warn('[APP] showDirectoryPicker failed, falling back to ZIP', err);
-          setWizardLocked(true);
-          elProgressWrap.style.display = 'flex';
-          elProgressLabel.textContent  = 'Preparing image data…';
-          _imageDataReady.then(function () { _runExport(null); });
-        });
-      return;
-    }
-
-    // No showDirectoryPicker — fall back to ZIP
     setWizardLocked(true);
     elProgressWrap.style.display = 'flex';
     elProgressLabel.textContent  = 'Preparing image data…';
-    _imageDataReady.then(function () { _runExport(null); });
-  }
-
-  /* ── Continue editing (after export) ───────────────────
-     Keeps the current selections but unlocks the wizard so the user
-     can tweak something and re-export.  Hides the success state and
-     brings back the export button.                                    */
-  function onContinueEditing() {
-    setWizardLocked(false);
-    elSuccessState.style.display = 'none';
-    elProgressWrap.style.display = 'none';
-    elBtnExport.style.display    = '';
-    elProgressLabel.style.color  = '';
+    _imageDataReady.then(function () { _runExport(); });
   }
 
   /* ── Start over ──────────────────────────────────────── */
@@ -680,8 +614,12 @@
     state.messageMode     = 'position';
     state.messagePreset   = null;
     state.messagePosition = '';
+    state.positionRef     = null;
+    state.referralLink    = '';
     state.cta             = null;
-    state.subLabel        = '';
+    state.subLabel        = [];
+    state.smartSuggestions = [];
+    syncReferralNudge();
     CANVAS.resetSeeds();
     setAccent(null);
 
@@ -700,7 +638,6 @@
     if (elPosMode)    elPosMode.classList.add('visible');
 
     setWizardLocked(false);
-    elSuccessState.style.display = 'none';
     elProgressWrap.style.display = 'none';
     elBtnExport.style.display    = '';
     elProgressLabel.style.color  = '';
@@ -708,6 +645,331 @@
     renderWizard();
     openStep(1);
     scheduleRender();
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     RESULTS SCREEN (§7)
+     After Generate Package completes, reveal the results section
+     below the wizard + preview panels and scroll to it.  The
+     wizard stays visible above so the user can scroll back up.
+  ══════════════════════════════════════════════════════════ */
+  var elResultsSection = $('results-section');
+  var elResultsTitle   = $('results-title');
+  var elResultsSubtitle = $('results-subtitle');
+
+  // Map of data-fmt → blob + filename + MIME. Populated when results render.
+  // Consumed by share + download + ZIP wiring.
+  var _resultMap = {};
+  // Cached object URLs for preview <img> elements so we can revoke them on restart.
+  var _previewUrls = [];
+
+  function filenameBase() {
+    var fn = $('filename-input');
+    return sanitizeFilename(fn ? fn.value : 'recruitment-banners');
+  }
+
+  function buildResultMap() {
+    _resultMap = {};
+    if (!_resultBlobs) return;
+    var base = filenameBase();
+    _resultMap.gif11  = { blob: _resultBlobs.gif11,  mime: 'image/gif',  name: base + '-1x1.gif'  };
+    _resultMap.png11  = { blob: _resultBlobs.png11,  mime: 'image/png',  name: base + '-1x1.png'  };
+    _resultMap.png916 = { blob: _resultBlobs.png916, mime: 'image/png',  name: base + '-9x16.png' };
+    if (_resultBlobs.videoResult && _resultBlobs.videoResult.blob) {
+      var ext = _resultBlobs.videoResult.ext || 'mp4';
+      _resultMap.video916 = {
+        blob: _resultBlobs.videoResult.blob,
+        mime: _resultBlobs.videoResult.blob.type || ('video/' + ext),
+        name: base + '-9x16.' + ext,
+        ext:  ext
+      };
+    }
+  }
+
+  function setPreviewImage(id, blob) {
+    var img = $(id);
+    if (!img || !blob) return;
+    var url = URL.createObjectURL(blob);
+    _previewUrls.push(url);
+    img.src = url;
+  }
+
+  function revokePreviewUrls() {
+    _previewUrls.forEach(function (u) {
+      try { URL.revokeObjectURL(u); } catch (_) {}
+    });
+    _previewUrls = [];
+  }
+
+  // Returns true if the browser natively supports sharing files (mobile Chrome,
+  // Safari iOS 15+). On desktop, navigator.share may exist but canShare({files})
+  // returns false — in that case we fall back to plain download.
+  function canNativeShareFiles() {
+    try {
+      if (!navigator.share || !navigator.canShare) return false;
+      var probe = new File([''], 'probe.gif', { type: 'image/gif' });
+      return !!navigator.canShare({ files: [probe] });
+    } catch (_) { return false; }
+  }
+
+  function positionHeadline() {
+    if (state.messageMode === 'position') {
+      return state.messagePosition || 'Recruitment Banner';
+    }
+    return state.messagePreset || 'Recruitment Banner';
+  }
+
+  function shareCaption() {
+    var head = positionHeadline();
+    var lines = ['We\'re hiring ' + head + '! Know someone great?'];
+    if (state.referralLink) lines.push(state.referralLink);
+    return lines.join('\n');
+  }
+
+  function shareFile(fmt) {
+    var entry = _resultMap[fmt];
+    if (!entry) return;
+    var file = new File([entry.blob], entry.name, { type: entry.mime });
+    if (canNativeShareFiles()) {
+      navigator.share({
+        files: [file],
+        title: positionHeadline(),
+        text:  shareCaption()
+      }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        console.warn('[share] failed, falling back to download:', err);
+        EXPORT.downloadBlob(entry.blob, entry.name);
+      });
+    } else {
+      // Desktop fallback: just download the file. Caption shown separately.
+      EXPORT.downloadBlob(entry.blob, entry.name);
+    }
+  }
+
+  function downloadFile(fmt) {
+    var entry = _resultMap[fmt];
+    if (!entry) return;
+    EXPORT.downloadBlob(entry.blob, entry.name);
+  }
+
+  function showResults() {
+    if (!_resultBlobs) return;
+    buildResultMap();
+    revokePreviewUrls();
+
+    // Header
+    if (elResultsTitle)    elResultsTitle.textContent = positionHeadline();
+    if (elResultsSubtitle) {
+      var brandName = state.brand ? BRANDS[state.brand].name : '';
+      var visualLabel = state.image ? state.image.label : '';
+      var bits = [];
+      if (brandName)  bits.push(brandName);
+      if (visualLabel) bits.push(visualLabel + ' visual');
+      elResultsSubtitle.textContent = bits.join(' · ');
+    }
+
+    // Previews — animated primary uses the motion blob (GIF/MP4 inline in <img>);
+    // video inside <img> isn't valid, so for story primary we use the static PNG
+    // frame-20 still as the thumbnail (the motion badge communicates "MP4").
+    setPreviewImage('sq-gif-img', _resultBlobs.gif11);
+    setPreviewImage('sq-png-img', _resultBlobs.png11);
+    setPreviewImage('st-vid-img', _resultBlobs.png916);   // static still as thumb
+    setPreviewImage('st-png-img', _resultBlobs.png916);
+
+    // Hide video card's motion badge if video unavailable
+    var videoCard = elResultsSection.querySelector('[data-fmt="video916"]');
+    if (videoCard) {
+      videoCard.style.display = _resultMap.video916 ? '' : 'none';
+    }
+
+    // Toggle share button labels + caption helper based on native-share support
+    var hasShare = canNativeShareFiles();
+    elResultsSection.querySelectorAll('.results-share-btn').forEach(function (btn) {
+      btn.textContent = hasShare ? '↗ Share' : '↓ Download';
+      btn.title = hasShare ? '' : 'On mobile, this opens the share sheet directly.';
+    });
+
+    syncReferralPanel();
+    syncCaptionHelper();
+
+    elResultsSection.style.display = 'block';
+    setTimeout(function () {
+      elResultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
+  }
+
+  function hideResults() {
+    revokePreviewUrls();
+    if (elResultsSection) elResultsSection.style.display = 'none';
+    _resultBlobs = null;
+    _resultMap   = {};
+  }
+
+  function onResultsZip() {
+    if (!_resultBlobs) return;
+    EXPORT.makeZip(
+      _resultBlobs.png11,
+      _resultBlobs.gif11,
+      _resultBlobs.png916,
+      _resultBlobs.videoResult
+    ).then(function (zipBlob) {
+      EXPORT.downloadBlob(zipBlob, filenameBase() + '.zip');
+    }).catch(function (err) {
+      console.error('[ZIP]', err);
+    });
+  }
+
+  function onResultsRestart() {
+    hideResults();
+    onRestart();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function wireResultsActions() {
+    if (!elResultsSection) return;
+    elResultsSection.querySelectorAll('.results-share-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { shareFile(btn.dataset.fmt); });
+    });
+    elResultsSection.querySelectorAll('.results-dl-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { downloadFile(btn.dataset.fmt); });
+    });
+    var zipBtn = $('btn-results-zip');
+    if (zipBtn) zipBtn.addEventListener('click', onResultsZip);
+    var restartBtn = $('btn-results-restart');
+    if (restartBtn) restartBtn.addEventListener('click', onResultsRestart);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     REFERRAL LINK (§9)
+     Nudge in step 3 (position mode only, after selection).
+     Input on results screen — validates against the Comeet
+     careers.overwolf.com prefix and updates share caption.
+  ══════════════════════════════════════════════════════════ */
+  var CAREERS_PREFIX = 'https://careers.overwolf.com/career/';
+
+  function syncReferralNudge() {
+    var nudge = $('referral-nudge');
+    if (!nudge) return;
+    var show = state.messageMode === 'position' && state.positionRef && state.positionRef.urlActivePage;
+    nudge.style.display = show ? '' : 'none';
+    if (!show) return;
+    var link = $('referral-nudge-link');
+    if (link) link.href = state.positionRef.urlActivePage;
+    var title = $('referral-nudge-title');
+    if (title) {
+      var reward = state.positionRef.referralReward;
+      title.textContent = reward
+        ? '✦ Refer someone and earn ' + reward
+        : '✦ Refer someone';
+    }
+  }
+
+  function syncReferralPanel() {
+    var panel = $('results-referral');
+    if (!panel) return;
+    var show = state.messageMode === 'position' && state.positionRef;
+    panel.style.display = show ? '' : 'none';
+    if (!show) return;
+    var link = $('results-referral-link');
+    if (link) link.href = state.positionRef.urlActivePage || '#';
+    var input = $('results-referral-input');
+    if (input) input.value = state.referralLink || '';
+    var ok = $('results-referral-ok');
+    if (ok) ok.style.display = state.referralLink ? '' : 'none';
+  }
+
+  function syncCaptionHelper() {
+    var cap = $('results-referral-caption');
+    if (!cap) return;
+    // Only surface the copyable caption helper on desktop fallback (no
+    // native share sheet). On mobile the share sheet delivers the caption.
+    var show = !canNativeShareFiles() && !!state.referralLink;
+    cap.style.display = show ? '' : 'none';
+    if (!show) return;
+    var ta = $('results-referral-caption-text');
+    if (ta) ta.value = shareCaption();
+  }
+
+  function wireReferral() {
+    var input = $('results-referral-input');
+    if (input) {
+      input.addEventListener('input', function () {
+        var v = input.value.trim();
+        if (v && v.indexOf(CAREERS_PREFIX) === 0) {
+          state.referralLink = v;
+        } else {
+          state.referralLink = '';
+        }
+        var ok = $('results-referral-ok');
+        if (ok) ok.style.display = state.referralLink ? '' : 'none';
+        syncCaptionHelper();
+      });
+    }
+    var copyBtn = $('results-referral-caption-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var ta = $('results-referral-caption-text');
+        if (!ta) return;
+        ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function(){});
+        var orig = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied';
+        setTimeout(function () { copyBtn.textContent = orig; }, 1600);
+      });
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     DESKTOP MOBILE-RECOMMENDATION BANNER (§7)
+  ══════════════════════════════════════════════════════════ */
+  function wireDesktopBanner() {
+    var banner = $('desktop-banner');
+    if (!banner) return;
+    var dismissed = false;
+    try { dismissed = sessionStorage.getItem('desktopBannerDismissed') === '1'; } catch (_) {}
+    if (dismissed) { banner.style.display = 'none'; return; }
+
+    var copyBtn = $('desktop-banner-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var url = window.location.href;
+        var done = function () {
+          var orig = copyBtn.textContent;
+          copyBtn.classList.add('copied');
+          copyBtn.textContent = 'Copied!';
+          setTimeout(function () {
+            copyBtn.classList.remove('copied');
+            copyBtn.textContent = orig;
+          }, 1600);
+        };
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(done).catch(function () {
+            _legacyCopy(url); done();
+          });
+        } else {
+          _legacyCopy(url); done();
+        }
+      });
+    }
+    var dismissBtn = $('desktop-banner-dismiss');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', function () {
+        banner.style.display = 'none';
+        try { sessionStorage.setItem('desktopBannerDismissed', '1'); } catch (_) {}
+      });
+    }
+  }
+
+  function _legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -737,9 +999,11 @@
 
     var all = _jobsCache || [];
 
-    // Filter by brand when positions exist for that brand
+    // Filter by brand when positions exist for that brand.
+    // Overwolf is the umbrella brand — always show every open role across
+    // the whole group so recruiters can tag any position under it.
     var positions = all;
-    if (state.brand) {
+    if (state.brand && state.brand !== 'overwolf') {
       var branded = all.filter(function (p) { return p.brand === state.brand; });
       if (branded.length) positions = branded;
     }
@@ -768,6 +1032,8 @@
 
   function onPositionSelect(pos) {
     state.messagePosition = pos.title;
+    state.positionRef     = pos;
+    syncReferralNudge();
 
     var grid = $('pos-grid');
     if (grid) grid.querySelectorAll('.pos-chip').forEach(function (el) {
@@ -781,10 +1047,19 @@
       if (/hybrid/i.test(wt))      mapped = 'Hybrid *';
       else if (/remote/i.test(wt)) mapped = 'Remote *';
     }
-    if (mapped) {
-      clearSubLabel();
-      onSubLabelSelect(mapped);
+    // Clear any previous auto-suggestions, then re-seed from this position.
+    // We only clear the entries that were auto-added last time — any chips
+    // the user selected manually stay put.
+    state.smartSuggestions.forEach(function (v) {
+      var i = state.subLabel.indexOf(v);
+      if (i !== -1) state.subLabel.splice(i, 1);
+    });
+    state.smartSuggestions = [];
+    if (mapped && SUBLABEL_OPTIONS.indexOf(mapped) !== -1) {
+      if (state.subLabel.indexOf(mapped) === -1) state.subLabel.push(mapped);
+      state.smartSuggestions.push(mapped);
     }
+    syncSubLabelUI();
 
     renderWizard();
     advance();
@@ -816,10 +1091,16 @@
       el.addEventListener('click', function () { onModeToggle(el.dataset.mode); });
     });
 
-    // Sub-label other input
+    // Sub-label other input — keeps the custom free-text in sync with the
+    // subLabel array (replaces the previous custom entry if present).
     if (elSubOtherInput) {
       elSubOtherInput.addEventListener('input', function () {
-        state.subLabel = elSubOtherInput.value;
+        if (_customSubLabel) {
+          var idx = state.subLabel.indexOf(_customSubLabel);
+          if (idx !== -1) state.subLabel.splice(idx, 1);
+        }
+        _customSubLabel = elSubOtherInput.value.trim();
+        if (_customSubLabel) state.subLabel.push(_customSubLabel);
         scheduleRender();
       });
     }
@@ -831,6 +1112,9 @@
 
     wireStepHeaders();
     wireIndicator();
+    wireResultsActions();
+    wireReferral();
+    wireDesktopBanner();
 
     renderWizard();
     openStep(1);

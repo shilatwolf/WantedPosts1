@@ -9,6 +9,16 @@
 </head>
 <body>
 
+<!-- ── Desktop mobile-recommendation banner ──────────────── -->
+<div class="desktop-banner" id="desktop-banner">
+  <span class="desktop-banner-text">
+    <span class="desktop-banner-emoji">📱</span>
+    For the best sharing experience, open this tool on your phone.
+  </span>
+  <button class="desktop-banner-btn" id="desktop-banner-copy">Copy link</button>
+  <button class="desktop-banner-dismiss" id="desktop-banner-dismiss" aria-label="Dismiss">✕</button>
+</div>
+
 <!-- ── Nav ──────────────────────────────────────────────── -->
 <nav class="nav">
   <a class="nav-logo" href="#">
@@ -97,20 +107,30 @@
     <div class="step locked" id="step-3">
       <div class="step-hd">
         <div class="step-num">3</div>
-        <span class="step-title">Write Your Message</span>
+        <span class="step-title">Choose Your Message</span>
         <span class="step-selection"></span>
       </div>
       <div class="step-body">
         <!-- Mode toggle -->
         <div class="msg-mode-row">
-          <div class="radio-btn active" data-mode="position">Position Name</div>
-          <div class="radio-btn" data-mode="preset">General Recruiting Messages</div>
+          <div class="radio-btn active" data-mode="position">Open Position</div>
+          <div class="radio-btn" data-mode="preset">General Message</div>
         </div>
 
         <!-- Position chips (default) -->
         <div id="pos-mode" class="pos-mode visible">
+          <p class="pos-hint pos-live-hint">These are your currently open positions, pulled live from your job listings.</p>
           <div id="pos-grid" class="pos-grid">
             <p class="pos-hint">Loading open positions…</p>
+          </div>
+
+          <!-- Referral nudge (position mode only, revealed on selection) -->
+          <div class="referral-nudge" id="referral-nudge" style="display:none">
+            <div class="referral-nudge-body">
+              <p class="referral-nudge-title" id="referral-nudge-title">✦ Refer someone and earn</p>
+              <p class="referral-nudge-desc">Get your personal referral link from the careers page.</p>
+            </div>
+            <a class="btn-s" id="referral-nudge-link" target="_blank" rel="noopener">Open position page →</a>
           </div>
         </div>
 
@@ -133,7 +153,8 @@
 
         <!-- Optional sub-label note under the button -->
         <div class="sublabel-section">
-          <p class="sublabel-heading">Add a note <span class="sublabel-optional">(optional)</span></p>
+          <p class="sublabel-smart-header" id="sublabel-smart-header" style="display:none">✦ Smart Suggestions <span class="sublabel-smart-hint">based on the selected position</span></p>
+          <p class="sublabel-heading">Add a note <span class="sublabel-optional">(optional — pick one or more)</span></p>
           <div class="sublabel-chips" id="sublabel-chips"></div>
           <div id="sublabel-other-wrap" class="sublabel-other-wrap" style="display:none">
             <input type="text" id="sublabel-other-input" class="pos-input"
@@ -184,10 +205,8 @@
         <p class="progress-label" id="progress-label">Preparing…</p>
       </div>
 
-      <div id="success-state" style="display:none"></div>
-
       <p style="font-size:11px;color:var(--t3);font-family:var(--font-brand);letter-spacing:.04em;line-height:1.6">
-        Choose an export package name. The app saves files directly to a folder when available; otherwise it falls back to a ZIP archive.
+        Generating takes ~15s. You'll see a results panel below with share & download options.
       </p>
 
     </div>
@@ -195,6 +214,146 @@
   </div><!-- /preview-panel -->
 
 </div><!-- /tool-wrap -->
+
+<!-- ── Results section (revealed after Generate Package) ─── -->
+<section class="results-section" id="results-section" style="display:none" aria-live="polite">
+  <div class="results-inner">
+
+    <header class="results-header">
+      <p class="results-eyebrow">✦ Your package is ready</p>
+      <h2 class="results-title" id="results-title">Recruitment Banner</h2>
+      <p class="results-subtitle" id="results-subtitle"></p>
+    </header>
+
+    <!-- ── Square format ──────────────────────────────── -->
+    <div class="results-group">
+      <div class="results-group-label">LinkedIn · Square format</div>
+
+      <article class="results-card results-card-primary" data-fmt="gif11">
+        <div class="results-preview results-preview-square">
+          <img id="sq-gif-img" alt="Square animated preview">
+          <span class="results-motion-badge"><span class="results-motion-dot"></span>GIF</span>
+        </div>
+        <div class="results-card-body">
+          <div class="results-format-name">1:1 Animated GIF</div>
+          <div class="results-format-desc">Best for LinkedIn feed posts</div>
+          <div class="results-badges">
+            <span class="results-badge">LinkedIn</span>
+            <span class="results-badge">Facebook</span>
+            <span class="results-badge">X / Twitter</span>
+          </div>
+          <div class="results-actions">
+            <button class="btn-p results-share-btn" data-fmt="gif11">↗ Share</button>
+            <button class="results-dl-btn" data-fmt="gif11" aria-label="Download GIF">↓</button>
+          </div>
+        </div>
+      </article>
+
+      <details class="results-disclosure">
+        <summary>Also available as static PNG</summary>
+        <article class="results-card results-card-secondary" data-fmt="png11">
+          <div class="results-preview results-preview-square">
+            <img id="sq-png-img" alt="Square static preview">
+          </div>
+          <div class="results-card-body">
+            <div class="results-format-name">1:1 Static PNG</div>
+            <div class="results-format-desc">Fallback for platforms that don't support animation</div>
+            <div class="results-badges">
+              <span class="results-badge">LinkedIn</span>
+              <span class="results-badge">Facebook</span>
+              <span class="results-badge">X / Twitter</span>
+            </div>
+            <div class="results-actions">
+              <button class="btn-s results-share-btn" data-fmt="png11">↗ Share</button>
+              <button class="results-dl-btn results-dl-ghost" data-fmt="png11" aria-label="Download PNG">↓</button>
+            </div>
+          </div>
+        </article>
+      </details>
+    </div>
+
+    <div class="results-divider"></div>
+
+    <!-- ── Story format ───────────────────────────────── -->
+    <div class="results-group">
+      <div class="results-group-label">Stories · Vertical format</div>
+
+      <article class="results-card results-card-primary results-card-story" data-fmt="video916">
+        <div class="results-preview results-preview-story">
+          <img id="st-vid-img" alt="Story animated preview">
+          <span class="results-motion-badge"><span class="results-motion-dot"></span>MP4</span>
+        </div>
+        <div class="results-card-body">
+          <div class="results-format-name">9:16 Animated MP4</div>
+          <div class="results-format-desc">Best for Instagram, TikTok, WhatsApp statuses</div>
+          <div class="results-badges">
+            <span class="results-badge">Instagram</span>
+            <span class="results-badge">TikTok</span>
+            <span class="results-badge">WhatsApp</span>
+          </div>
+          <div class="results-actions">
+            <button class="btn-p results-share-btn" data-fmt="video916">↗ Share</button>
+            <button class="results-dl-btn" data-fmt="video916" aria-label="Download MP4">↓</button>
+          </div>
+        </div>
+      </article>
+
+      <details class="results-disclosure">
+        <summary>Also available as static PNG</summary>
+        <article class="results-card results-card-secondary results-card-story" data-fmt="png916">
+          <div class="results-preview results-preview-story">
+            <img id="st-png-img" alt="Story static preview">
+          </div>
+          <div class="results-card-body">
+            <div class="results-format-name">9:16 Static PNG</div>
+            <div class="results-format-desc">Fallback for platforms that don't support animation</div>
+            <div class="results-badges">
+              <span class="results-badge">Instagram</span>
+              <span class="results-badge">TikTok</span>
+              <span class="results-badge">WhatsApp</span>
+            </div>
+            <div class="results-actions">
+              <button class="btn-s results-share-btn" data-fmt="png916">↗ Share</button>
+              <button class="results-dl-btn results-dl-ghost" data-fmt="png916" aria-label="Download PNG">↓</button>
+            </div>
+          </div>
+        </article>
+      </details>
+    </div>
+
+    <!-- ── Referral link (position mode only) ─────────── -->
+    <div class="results-referral" id="results-referral" style="display:none">
+      <p class="results-referral-title">✦ Add your referral link</p>
+      <p class="results-referral-desc">Paste it below to include it in your share caption.</p>
+      <div class="results-referral-input-row">
+        <input type="url" id="results-referral-input" class="pos-input"
+          placeholder="https://careers.overwolf.com/career/…?ref=…" autocomplete="off" spellcheck="false">
+        <a class="btn-s" id="results-referral-link" target="_blank" rel="noopener">Open position page →</a>
+      </div>
+      <p class="results-referral-ok" id="results-referral-ok" style="display:none">✓ Referral link saved</p>
+
+      <!-- Desktop caption copy helper — filled by app.js when navigator.share is unavailable -->
+      <div class="results-referral-caption" id="results-referral-caption" style="display:none">
+        <label class="results-referral-caption-label">Share caption</label>
+        <textarea id="results-referral-caption-text" readonly rows="3"></textarea>
+        <button class="btn-s" id="results-referral-caption-copy">Copy caption</button>
+      </div>
+    </div>
+
+    <!-- ── ZIP row ────────────────────────────────────── -->
+    <div class="results-zip">
+      <div class="results-zip-body">
+        <div class="results-zip-title">Download everything</div>
+        <div class="results-zip-desc">All 4 files as a ZIP archive</div>
+      </div>
+      <button class="btn-s" id="btn-results-zip">↓ ZIP</button>
+    </div>
+
+    <!-- ── Start over ─────────────────────────────────── -->
+    <button class="btn-ghost results-restart" id="btn-results-restart">↑ Start Over</button>
+
+  </div>
+</section>
 
 <!-- ── Footer ────────────────────────────────────────────── -->
 <footer>
