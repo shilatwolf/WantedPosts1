@@ -11,3 +11,13 @@
   for = "/assets/**"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+
+# ffmpeg.wasm needs SharedArrayBuffer, which browsers gate behind
+# cross-origin isolation. COOP same-origin + COEP require-corp enables it.
+# Scoped to the app HTML only; CDN scripts (gif.js, jszip, ffmpeg) are loaded
+# via crossorigin=anonymous script tags and stay accessible.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"

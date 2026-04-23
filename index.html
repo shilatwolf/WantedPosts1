@@ -376,10 +376,14 @@
   <span class="ftag">Internal Tool</span>
 </footer>
 
-<!-- ── CDN libs ───────────────────────────────────────────── -->
-<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js"></script>
+<!-- ── CDN libs ─────────────────────────────────────────────
+     crossorigin="anonymous" is required under COEP require-corp
+     (enabled in netlify.toml so ffmpeg.wasm can use SharedArrayBuffer).
+     jsdelivr serves with `Access-Control-Allow-Origin: *` so these
+     load cleanly. -->
+<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js" crossorigin="anonymous"></script>
 <script src="gif.worker.blob.js"></script>
 
 <!-- ── App scripts (order matters) ───────────────────────── -->

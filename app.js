@@ -865,10 +865,24 @@
     setPreviewImage('st-vid-img', _resultBlobs.png916);   // static still as thumb
     setPreviewImage('st-png-img', _resultBlobs.png916);
 
-    // Hide video card's motion badge if video unavailable
+    // Hide the video card entirely if no video blob, otherwise relabel it
+    // to reflect the actual output format (MP4 when ffmpeg.wasm transcoded,
+    // WebM if it fell back). WebM still plays in Chrome/Firefox/Edge but
+    // not iOS/Safari/QuickTime — surface that inline so users aren't surprised.
     var videoCard = elResultsSection.querySelector('[data-fmt="video916"]');
     if (videoCard) {
       videoCard.style.display = _resultMap.video916 ? '' : 'none';
+      if (_resultMap.video916) {
+        var isWebm = _resultMap.video916.ext === 'webm';
+        var badge  = videoCard.querySelector('.results-motion-badge');
+        var fname  = videoCard.querySelector('.results-format-name');
+        var fdesc  = videoCard.querySelector('.results-format-desc');
+        if (badge) badge.lastChild.textContent = isWebm ? 'WEBM' : 'MP4';
+        if (fname) fname.textContent = isWebm ? '9:16 Animated WebM' : '9:16 Animated MP4';
+        if (fdesc) fdesc.textContent = isWebm
+          ? 'Saved as .webm — open in Chrome, Firefox or Edge to view.'
+          : 'Best for Instagram, TikTok, WhatsApp statuses';
+      }
     }
 
     // Toggle share button labels + caption helper based on native-share support

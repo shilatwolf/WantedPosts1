@@ -270,46 +270,51 @@ const CANVAS = (function () {
     var fineDots  = [];    // small grey particles
     var embers    = [];    // brand-accent sparks
 
-    for (var i = 0; i < 12; i++) {
+    // Opacity values bumped ~2-3× over the Round-1 spec baseline — at the
+    // original values the particles were technically rendered but compressed
+    // out of existence by GIF dithering + MP4 VP9/H.264 compression, leaving
+    // flat-looking exports.  These levels still read as "ambient smoke",
+    // not "fireworks", while surviving the pipeline.
+    for (var i = 0; i < 16; i++) {
       deepSmoke.push({
         x:   r() * w,
-        y:   h * 0.6 + r() * h * 0.4,   // weighted to bottom 40%
-        rad: 40 + r() * 40,
-        op:  0.03 + r() * 0.03,
-        spd: 6 + r() * 3                // px/s (0.2–0.3 @ 30fps)
+        y:   h * 0.5 + r() * h * 0.5,
+        rad: 60 + r() * 80,
+        op:  0.08 + r() * 0.08,       // was 0.03–0.06 → 0.08–0.16
+        spd: 6 + r() * 6
       });
     }
-    for (var j = 0; j < 18; j++) {
+    for (var j = 0; j < 22; j++) {
       midSmoke.push({
         xBase: r() * w,
         y:     r() * h,
-        rad:   20 + r() * 25,
-        op:    0.02 + r() * 0.02,
-        spd:   12 + r() * 6,
+        rad:   25 + r() * 35,
+        op:    0.06 + r() * 0.06,     // was 0.02–0.04 → 0.06–0.12
+        spd:   12 + r() * 10,
         phase: r() * Math.PI * 2
       });
     }
     // Scale particle counts with canvas area so 9:16 isn't sparse
     var areaScale = (w * h) / (1080 * 1080);
-    var nFine = Math.round(30 * areaScale);
+    var nFine = Math.round(48 * areaScale);   // was 30 → 48
     for (var k = 0; k < nFine; k++) {
       var bottomBias = r() < 0.75;
       fineDots.push({
         x:   r() * w,
         y:   bottomBias ? (h * 0.4 + r() * h * 0.6) : r() * h,
-        rad: 1 + r() * 1.5,
-        op:  0.05 + r() * 0.10,
-        spd: 18 + r() * 12
+        rad: 1.2 + r() * 1.6,
+        op:  0.18 + r() * 0.22,       // was 0.05–0.15 → 0.18–0.40
+        spd: 18 + r() * 16
       });
     }
-    var nEmbers = Math.round(8 * areaScale);
+    var nEmbers = Math.round(14 * areaScale); // was 8 → 14
     for (var m = 0; m < nEmbers; m++) {
       embers.push({
         x:            r() * w,
         y:            h * 0.3 + r() * h * 0.7,
-        rad:          0.8 + r() * 0.7,
-        op:           0.06 + r() * 0.06,
-        spd:          24 + r() * 18,
+        rad:          1.2 + r() * 1.3,
+        op:           0.28 + r() * 0.30,   // was 0.06–0.12 → 0.28–0.58
+        spd:          24 + r() * 22,
         flickerPhase: r() * Math.PI * 2
       });
     }
