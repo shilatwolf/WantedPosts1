@@ -573,17 +573,22 @@ body {
 }
 .sublabel-chip:hover { border-color:var(--b2); color:var(--tp); }
 .sublabel-chip.selected { border-color:var(--accent); color:var(--accent); background:var(--s2); }
-.sublabel-chip.smart {
+/* Suggested — rendered only inside the Smart Suggestions box.
+   Highlighted (accent border + accent text) but NOT pre-selected.
+   The employee must tap to confirm; on tap .selected is added and
+   the chip visually flips to the filled/selected style. */
+.sublabel-chip.suggested {
   border-color:var(--accent);
   color:var(--accent);
-  background:var(--s2);
-  position:relative;
-  box-shadow:0 0 0 1px var(--accent) inset;
+  background:transparent;
 }
-.sublabel-chip.smart::before {
-  content:'✦';
-  margin-right:6px;
-  font-size:10px;
+.sublabel-chip.suggested:hover {
+  background:var(--ow-f);
+  color:var(--accent);
+  border-color:var(--accent);
+}
+.sublabel-chip.suggested.selected {
+  background:var(--s2);
 }
 .sublabel-other-wrap { margin-top:var(--sp-200); }
 
@@ -1178,20 +1183,60 @@ footer {
     gap:var(--sp-600);
     align-items:start;
   }
-  /* Keep the 1:1 preview from dominating on wide screens */
+
+  /* Primary cards get a fixed preview height so both columns match.
+     Square preview → 320px tall box, image cover-fits.
+     Story preview  → 320px tall box with a 288×162 portrait frame centered. */
   .results-formats-row .results-card-primary .results-preview-square {
+    aspect-ratio:auto;
+    width:100%;
     max-width:360px;
     margin:0 auto;
+    height:320px;
   }
+  .results-formats-row .results-card-primary .results-preview-square img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
   /* Desktop: story card becomes vertical with portrait centered */
   .results-formats-row .results-card-story {
     flex-direction:column;
     gap:var(--sp-400);
   }
   .results-formats-row .results-card-story .results-preview-story {
-    width:100px;
-    height:178px;
-    align-self:center;
+    aspect-ratio:auto;
+    width:100%;
+    height:320px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#050505;
+    border:1px solid var(--b4);
+    padding:0;
+  }
+  .results-formats-row .results-card-story .results-preview-story img {
+    width:162px;
+    height:288px;
+    object-fit:cover;
+    border:1px solid var(--b4);
+  }
+  /* Motion badge sits on top-right of the portrait frame, not the big container */
+  .results-formats-row .results-card-story .results-motion-badge {
+    top:calc(50% - 144px + 8px);   /* 144 = 288/2; +8px inset */
+    right:calc(50% - 81px + 8px);  /* 81  = 162/2; +8px inset */
+  }
+
+  /* Stretch cards to same height, push action row to the bottom */
+  .results-formats-row .results-card-primary {
+    height:100%;
+  }
+  .results-formats-row .results-card-primary .results-card-body {
+    flex:1;
+  }
+  .results-formats-row .results-card-primary .results-actions {
+    margin-top:auto;
   }
 }
 

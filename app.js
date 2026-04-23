@@ -504,19 +504,18 @@
       var v = el.dataset.value;
       if (v === '__other__') {
         el.classList.toggle('selected', !!_customSubLabel);
-        el.classList.remove('smart');
         return;
       }
       el.classList.toggle('selected', state.subLabel.indexOf(v) !== -1);
-      el.classList.toggle('smart', state.smartSuggestions.indexOf(v) !== -1);
     });
     renderSmartBox();
   }
 
-  // Populate the dedicated Smart Suggestions box. Each chip is a clone of
-  // the same visual chip used in the full pool; clicking either syncs to
-  // the shared state.subLabel array, so deselecting from either location
-  // works identically.
+  // Populate the dedicated Smart Suggestions box. Chips render in the
+  // "suggested" visual state — accent border / accent text / transparent
+  // background — but are NOT pre-selected. Clicking promotes a chip into
+  // state.subLabel (and flips it to the selected style). The same chip
+  // in the full pool stays in sync via syncSubLabelUI().
   function renderSmartBox() {
     var box  = document.getElementById('sublabel-smart-box');
     var host = document.getElementById('sublabel-smart-chips');
@@ -526,7 +525,7 @@
     host.innerHTML = '';
     state.smartSuggestions.forEach(function (text) {
       var chip = document.createElement('div');
-      chip.className = 'sublabel-chip smart';
+      chip.className = 'sublabel-chip suggested';
       if (state.subLabel.indexOf(text) !== -1) chip.classList.add('selected');
       chip.dataset.value = text;
       chip.textContent = text;
@@ -1131,18 +1130,20 @@
       el.classList.toggle('selected', el.dataset.title === pos.title);
     });
 
-    // Clear previous auto-suggestions (user-picked chips stay put), then
-    // re-seed from the exhaustive extractSuggestions output.
+    // Surface the extracted suggestions, but DO NOT auto-apply them to
+    // state.subLabel. Comeet's workplace_type / is_remote fields are
+    // sometimes out of date — pre-selecting them would cause employees to
+    // unknowingly post inaccurate tags. Chips render in a distinct
+    // "highlighted but unselected" state and require an explicit tap.
+    //
+    // Any chips the user manually selected from a prior position stay put.
+    // If the old smart set included auto-applied chips (from the previous
+    // behaviour), clear them now so the state is consistent.
     state.smartSuggestions.forEach(function (v) {
       var i = state.subLabel.indexOf(v);
       if (i !== -1) state.subLabel.splice(i, 1);
     });
-    state.smartSuggestions = [];
-    var suggestions = extractSuggestions(pos);
-    suggestions.forEach(function (v) {
-      if (state.subLabel.indexOf(v) === -1) state.subLabel.push(v);
-      if (state.smartSuggestions.indexOf(v) === -1) state.smartSuggestions.push(v);
-    });
+    state.smartSuggestions = extractSuggestions(pos);
     syncSubLabelUI();
 
     renderWizard();
