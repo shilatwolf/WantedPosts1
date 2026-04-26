@@ -1275,6 +1275,18 @@ footer {
 .results-card-primary {
   border-color:var(--ow-f);
 }
+
+/* Video-card error state — shown when the MP4 transcode/record pipeline
+   couldn't produce a playable MP4. Never show a broken webm file. */
+.results-card-error {
+  border-color:var(--terr);
+  opacity:0.75;
+}
+.results-card-error .results-preview {
+  opacity:0.35;
+  filter:grayscale(1);
+}
+.results-card-error .results-format-name { color:var(--terr); }
 .results-card-secondary {
   margin-top:-1px;     /* Visually connects to disclosure header */
   background:#0c0c0c;
@@ -1370,7 +1382,7 @@ footer {
   text-transform:uppercase;
 }
 
-/* Actions row — share (full width minus icon) + download (32px icon) */
+/* Actions row — share (fills remaining space) + labelled Save button */
 .results-actions {
   display:flex;
   align-items:stretch;
@@ -1379,21 +1391,30 @@ footer {
 }
 .results-share-btn {
   flex:1;
+  min-width:0;
   justify-content:center;
 }
 .results-dl-btn {
-  width:32px; height:32px;
-  padding:0;
-  background:var(--accent);
-  border:none;
-  color:#fff;
-  font-size:16px;
-  font-weight:var(--fw-bold);
-  cursor:pointer;
-  transition:background .15s;
   flex-shrink:0;
+  min-width:96px;
+  padding:var(--sp-200) var(--sp-400);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  background:transparent;
+  border:1px solid var(--b2);
+  font-family:var(--font-brand);
+  font-size:11px;
+  font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-up);
+  text-transform:uppercase;
+  color:var(--tp);
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
 }
-.results-dl-btn:hover { background:var(--accent-hover); }
+.results-dl-btn:hover { background:var(--accent); border-color:transparent; color:#fff; }
+/* Ghost variant kept as alias — same style, used under PNG disclosure */
 .results-dl-ghost {
   background:transparent;
   border:1px solid var(--b2);

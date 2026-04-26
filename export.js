@@ -147,19 +147,20 @@ const EXPORT = (function () {
         return;
       }
 
-      // WebM first — reliably produced by every modern browser and re-encoded
-      // by ffmpeg.wasm to a clean, universal H.264 MP4 (iOS/QuickTime/Android
-      // safe). Native Chrome 130+ MP4 output is fragmented MP4 which some
-      // desktop players refuse to open, so we avoid it even when available.
+      // Approach C — prefer native H.264 MP4 MediaRecorder when the browser
+      // supports it (Chrome 130+, Safari 17+). No transcoding needed: the
+      // output is directly playable on Instagram / TikTok / WhatsApp / iOS.
+      // Fall back to webm when MP4 isn't native; ffmpeg.wasm then transcodes
+      // the webm to H.264 MP4 (Approach A).
       // videoBitsPerSecond: high bitrate so particle/smoke detail survives
-      // compression before the ffmpeg transcode step.
+      // compression + any subsequent transcode step.
       var candidateList = [
-        { mime: 'video/webm;codecs=vp9',        ext: 'webm', bps: 8000000 },
-        { mime: 'video/webm;codecs=vp8',        ext: 'webm', bps: 6000000 },
-        { mime: 'video/webm',                   ext: 'webm', bps: 6000000 },
         { mime: 'video/mp4;codecs=avc1.42E01F', ext: 'mp4',  bps: 6000000 },
         { mime: 'video/mp4;codecs=avc1',        ext: 'mp4',  bps: 6000000 },
-        { mime: 'video/mp4',                    ext: 'mp4',  bps: 6000000 }
+        { mime: 'video/mp4',                    ext: 'mp4',  bps: 6000000 },
+        { mime: 'video/webm;codecs=vp9',        ext: 'webm', bps: 8000000 },
+        { mime: 'video/webm;codecs=vp8',        ext: 'webm', bps: 6000000 },
+        { mime: 'video/webm',                   ext: 'webm', bps: 6000000 }
       ];
 
       var oc  = document.createElement('canvas');
@@ -257,21 +258,42 @@ const EXPORT = (function () {
   var _ffmpeg = null;
   var _ffmpegLoadPromise = null;
 
+  // ffmpeg.wasm needs SharedArrayBuffer, which is only available when
+  // the page is cross-origin-isolated (COOP: same-origin + COEP: require-corp).
+  // Log the state on first use so misconfigured headers are easy to diagnose.
+  function _sharedArrayBufferAvailable() {
+    try { return typeof SharedArrayBuffer !== 'undefined'; }
+    catch (e) { return false; }
+  }
+
   function _hasFFmpeg() {
     return (typeof FFmpeg !== 'undefined' && typeof FFmpeg.createFFmpeg === 'function' && typeof FFmpeg.fetchFile === 'function')
       || (typeof FFmpegWASM !== 'undefined' && typeof FFmpegWASM.createFFmpeg === 'function' && typeof FFmpegWASM.fetchFile === 'function');
   }
 
   function _loadFFmpeg() {
+    if (!_sharedArrayBufferAvailable()) {
+      console.warn('[ffmpeg] SharedArrayBuffer unavailable — COOP/COEP headers missing. Page is not cross-origin-isolated.');
+      return Promise.reject(new Error('SharedArrayBuffer unavailable'));
+    }
     if (!_hasFFmpeg()) {
-      return Promise.reject(new Error('FFmpeg not loaded'));
+      return Promise.reject(new Error('FFmpeg UMD not loaded'));
     }
     if (_ffmpegLoadPromise) {
       return _ffmpegLoadPromise;
     }
     var ffmpegModule = typeof FFmpeg !== 'undefined' ? FFmpeg : FFmpegWASM;
-    _ffmpeg = ffmpegModule.createFFmpeg({ log: false });
-    _ffmpegLoadPromise = _ffmpeg.load();
+    // Pin ffmpeg-core to 0.11.0 (matches @ffmpeg/ffmpeg@0.11.6 UMD).
+    // unpkg serves with Access-Control-Allow-Origin: * + CORP cross-origin
+    // so the core + wasm load cleanly under COEP require-corp.
+    _ffmpeg = ffmpegModule.createFFmpeg({
+      log: false,
+      corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+    });
+    _ffmpegLoadPromise = _ffmpeg.load().catch(function (err) {
+      _ffmpegLoadPromise = null;   // allow retry on next call
+      throw err;
+    });
     return _ffmpegLoadPromise;
   }
 
@@ -396,22 +418,23 @@ const EXPORT = (function () {
           throw err;
         })
         .then(function (result) {
-          if (!result || !result.blob) return result;
-          // Always transcode through ffmpeg when available — normalises
-          // fragmented MP4 and webm alike into a clean H.264 MP4 with a
-          // faststart moov atom that plays everywhere (iOS, QuickTime,
-          // Android, all browsers). Fallback keeps the raw output if
-          // ffmpeg.wasm can't load (COOP/COEP missing, or CDN blocked).
-          if (_hasFFmpeg()) {
-            step(94, 'Re-encoding video to MP4…');
-            return _reencodeVideoToMP4(result.blob)
-              .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
-              .catch(function (err) {
-                console.warn('[EXPORT] ffmpeg transcode failed, keeping ' + result.ext + ':', err);
-                return result;
-              });
-          }
-          return result;
+          if (!result || !result.blob) return null;
+
+          // Approach C — MediaRecorder already produced native H.264 MP4.
+          // No transcode needed; the file plays on iOS / Instagram / TikTok.
+          if (result.ext === 'mp4') return result;
+
+          // Approach A — webm → transcode to H.264 MP4 via ffmpeg.wasm.
+          // If transcode fails we return null; app.js shows an error state
+          // on the video card rather than handing the user an unplayable
+          // .webm file labelled as MP4.
+          step(94, 'Re-encoding video to MP4…');
+          return _reencodeVideoToMP4(result.blob)
+            .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
+            .catch(function (err) {
+              console.warn('[EXPORT] ffmpeg transcode failed — video will be shown as error:', err);
+              return null;
+            });
         });
       })
       .then(function (result) {
@@ -461,20 +484,17 @@ const EXPORT = (function () {
           throw err;
         })
         .then(function (result) {
-          if (!result || !result.blob) return result;
-          // Always transcode — normalises fragmented MP4 + webm alike into
-          // a universal H.264 MP4. Fallback keeps raw output if ffmpeg.wasm
-          // can't load (e.g. COOP/COEP headers missing).
-          if (_hasFFmpeg()) {
-            step(94, 'Re-encoding video to MP4…');
-            return _reencodeVideoToMP4(result.blob)
-              .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
-              .catch(function (err) {
-                console.warn('[EXPORT] ffmpeg transcode failed, keeping ' + result.ext + ':', err);
-                return result;
-              });
-          }
-          return result;
+          if (!result || !result.blob) return null;
+          // Native MP4 — use directly.
+          if (result.ext === 'mp4') return result;
+          // Webm — transcode; on failure return null (no webm fallback).
+          step(94, 'Re-encoding video to MP4…');
+          return _reencodeVideoToMP4(result.blob)
+            .then(function (mp4Blob) { return { blob: mp4Blob, ext: 'mp4' }; })
+            .catch(function (err) {
+              console.warn('[EXPORT] ffmpeg transcode failed:', err);
+              return null;
+            });
         });
       })
       .then(function (result) {

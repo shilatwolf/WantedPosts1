@@ -259,7 +259,7 @@
           </div>
           <div class="results-actions">
             <button class="btn-p results-share-btn" data-fmt="gif11">↗ Share</button>
-            <button class="results-dl-btn" data-fmt="gif11" aria-label="Download GIF">↓</button>
+            <button class="results-dl-btn" data-fmt="gif11" aria-label="Download GIF">↓ Save</button>
           </div>
         </div>
       </article>
@@ -280,7 +280,7 @@
             </div>
             <div class="results-actions">
               <button class="btn-s results-share-btn" data-fmt="png11">↗ Share</button>
-              <button class="results-dl-btn results-dl-ghost" data-fmt="png11" aria-label="Download PNG">↓</button>
+              <button class="results-dl-btn results-dl-ghost" data-fmt="png11" aria-label="Download PNG">↓ Save</button>
             </div>
           </div>
         </article>
@@ -306,7 +306,7 @@
           </div>
           <div class="results-actions">
             <button class="btn-p results-share-btn" data-fmt="video916">↗ Share</button>
-            <button class="results-dl-btn" data-fmt="video916" aria-label="Download MP4">↓</button>
+            <button class="results-dl-btn" data-fmt="video916" aria-label="Download MP4">↓ Save</button>
           </div>
         </div>
       </article>
@@ -327,7 +327,7 @@
             </div>
             <div class="results-actions">
               <button class="btn-s results-share-btn" data-fmt="png916">↗ Share</button>
-              <button class="results-dl-btn results-dl-ghost" data-fmt="png916" aria-label="Download PNG">↓</button>
+              <button class="results-dl-btn results-dl-ghost" data-fmt="png916" aria-label="Download PNG">↓ Save</button>
             </div>
           </div>
         </article>
@@ -379,11 +379,13 @@
 <!-- ── CDN libs ─────────────────────────────────────────────
      crossorigin="anonymous" is required under COEP require-corp
      (enabled in netlify.toml so ffmpeg.wasm can use SharedArrayBuffer).
-     jsdelivr serves with `Access-Control-Allow-Origin: *` so these
-     load cleanly. -->
+     jsdelivr + unpkg both serve with `Access-Control-Allow-Origin: *`
+     so these load cleanly.
+     ffmpeg pinned to 0.11.x — stable UMD build compatible with the
+     createFFmpeg() API used by export.js. 0.12.x is ESM-only. -->
 <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js" crossorigin="anonymous"></script>
 <script src="gif.worker.blob.js"></script>
 
 <!-- ── App scripts (order matters) ───────────────────────── -->

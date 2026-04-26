@@ -744,16 +744,16 @@
     _resultMap.gif11  = { blob: _resultBlobs.gif11,  mime: 'image/gif',  name: base + '-1x1.gif'  };
     _resultMap.png11  = { blob: _resultBlobs.png11,  mime: 'image/png',  name: base + '-1x1.png'  };
     _resultMap.png916 = { blob: _resultBlobs.png916, mime: 'image/png',  name: base + '-9x16.png' };
-    if (_resultBlobs.videoResult && _resultBlobs.videoResult.blob) {
-      var ext = _resultBlobs.videoResult.ext || 'mp4';
-      // navigator.share is picky — use canonical top-level MIME ('video/mp4'
-      // or 'video/webm'), never the codec-qualified variant ('video/mp4;codecs=avc1').
-      var mime = (ext === 'webm') ? 'video/webm' : 'video/mp4';
+    // Video pipeline only produces MP4 now — webm is no longer an accepted
+    // output. If videoResult is null the video card renders in an error
+    // state (see showResults). Never hand users a .webm file.
+    if (_resultBlobs.videoResult && _resultBlobs.videoResult.blob &&
+        _resultBlobs.videoResult.ext === 'mp4') {
       _resultMap.video916 = {
         blob: _resultBlobs.videoResult.blob,
-        mime: mime,
-        name: base + '-9x16.' + ext,
-        ext:  ext
+        mime: 'video/mp4',   // canonical top-level MIME (navigator.share fussy)
+        name: base + '-9x16.mp4',
+        ext:  'mp4'
       };
     }
   }
@@ -865,23 +865,34 @@
     setPreviewImage('st-vid-img', _resultBlobs.png916);   // static still as thumb
     setPreviewImage('st-png-img', _resultBlobs.png916);
 
-    // Hide the video card entirely if no video blob, otherwise relabel it
-    // to reflect the actual output format (MP4 when ffmpeg.wasm transcoded,
-    // WebM if it fell back). WebM still plays in Chrome/Firefox/Edge but
-    // not iOS/Safari/QuickTime — surface that inline so users aren't surprised.
+    // Video card: MP4 is the only acceptable output. If the pipeline
+    // couldn't produce one (ffmpeg.wasm failed / not available and no
+    // native MP4 MediaRecorder), flip the card into an error state
+    // telling the user to retry or use the PNG. We NEVER hand out webm.
     var videoCard = elResultsSection.querySelector('[data-fmt="video916"]');
     if (videoCard) {
-      videoCard.style.display = _resultMap.video916 ? '' : 'none';
-      if (_resultMap.video916) {
-        var isWebm = _resultMap.video916.ext === 'webm';
-        var badge  = videoCard.querySelector('.results-motion-badge');
-        var fname  = videoCard.querySelector('.results-format-name');
-        var fdesc  = videoCard.querySelector('.results-format-desc');
-        if (badge) badge.lastChild.textContent = isWebm ? 'WEBM' : 'MP4';
-        if (fname) fname.textContent = isWebm ? '9:16 Animated WebM' : '9:16 Animated MP4';
-        if (fdesc) fdesc.textContent = isWebm
-          ? 'Saved as .webm — open in Chrome, Firefox or Edge to view.'
-          : 'Best for Instagram, TikTok, WhatsApp statuses';
+      videoCard.style.display = '';
+      var hasMp4 = !!_resultMap.video916;
+      videoCard.classList.toggle('results-card-error', !hasMp4);
+
+      var badge   = videoCard.querySelector('.results-motion-badge');
+      var fname   = videoCard.querySelector('.results-format-name');
+      var fdesc   = videoCard.querySelector('.results-format-desc');
+      var actions = videoCard.querySelector('.results-actions');
+      var badges  = videoCard.querySelector('.results-badges');
+
+      if (hasMp4) {
+        if (badge)  { badge.style.display = ''; badge.lastChild.textContent = 'MP4'; }
+        if (fname)  fname.textContent = '9:16 Animated MP4';
+        if (fdesc)  fdesc.textContent = 'Best for Instagram, TikTok, WhatsApp statuses';
+        if (actions) actions.style.display = '';
+        if (badges)  badges.style.display  = '';
+      } else {
+        if (badge)  badge.style.display = 'none';
+        if (fname)  fname.textContent = '9:16 Video export failed';
+        if (fdesc)  fdesc.textContent = 'Try generating again — or use the static PNG below.';
+        if (actions) actions.style.display = 'none';
+        if (badges)  badges.style.display  = 'none';
       }
     }
 
