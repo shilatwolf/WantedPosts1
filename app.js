@@ -776,6 +776,23 @@
   // ── Device + share capability detection ──────────────
   var IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+  // Mobile devices land downloads in the Photos app (iOS) or Gallery
+  // (Android Chrome via download intent), so we surface that explicitly.
+  // Desktop downloads land in the Downloads folder — "Save" reads cleaner
+  // there than the slightly misleading "Save to Camera Roll".
+  function saveLabel(withIcon) {
+    var label = IS_MOBILE ? 'Save to Camera Roll' : 'Save';
+    return withIcon ? '↓ ' + label : label;
+  }
+  function savedLabel() {
+    return IS_MOBILE ? '✓ Saved to Camera Roll' : '✓ Saved';
+  }
+  function gifSavedTip() {
+    return IS_MOBILE
+      ? 'Saved to your gallery — open LinkedIn and post from there'
+      : 'Saved — open LinkedIn and attach from your Downloads folder';
+  }
+
   // Probe canShare() WITH the actual file type the caller will share. iOS
   // Safari rejects MP4 file shares based on size; Android Chrome differs
   // for image vs video. The probe must match the actual file's MIME.
@@ -858,10 +875,15 @@
     var tip   = $('tip-gif');
     if (btn) {
       btn.classList.add('is-saved');
-      btn.textContent = '✓ Saved to Camera Roll';
+      btn.textContent = savedLabel();   // "✓ Saved to Camera Roll" or "✓ Saved"
     }
-    if (tip)   tip.style.display = 'none';
-    if (saved) saved.style.display = '';
+    // Hide the original tip and show the device-aware confirmation panel.
+    if (tip) tip.style.display = 'none';
+    if (saved) {
+      saved.style.display = '';
+      var savedText = saved.querySelector('.saved-text');
+      if (savedText) savedText.textContent = gifSavedTip();
+    }
   }
 
   // ── MP4: share to Stories (Instagram / TikTok / WhatsApp) ──
@@ -958,10 +980,13 @@
     var gifTip   = $('tip-gif');
     if (gifBtn) {
       gifBtn.classList.remove('is-saved');
-      gifBtn.textContent = '↓ Save to Camera Roll';
+      gifBtn.textContent = saveLabel(true);   // "↓ Save to Camera Roll" or "↓ Save"
     }
     if (gifSaved) gifSaved.style.display = 'none';
-    if (gifTip)   gifTip.style.display   = '';
+    if (gifTip) {
+      gifTip.style.display = '';
+      gifTip.textContent   = 'Save to your gallery, then post on LinkedIn';
+    }
 
     // ── MP4 card: device-specific primary action ──
     var mp4Btn = $('btn-share-mp4');
@@ -975,6 +1000,13 @@
         mp4Tip.textContent = 'On mobile you can share directly to Instagram, TikTok, and WhatsApp';
       }
     }
+    // MP4 card secondary "Save" + PNG cards' Save labels
+    var saveMp4Btn = $('btn-save-mp4-gallery');
+    if (saveMp4Btn) saveMp4Btn.textContent = saveLabel(false);
+    var savePng11Btn  = $('btn-save-png11');
+    if (savePng11Btn)  savePng11Btn.textContent  = '↓ ' + saveLabel(false);
+    var savePng916Btn = $('btn-save-png916');
+    if (savePng916Btn) savePng916Btn.textContent = '↓ ' + saveLabel(false);
 
     syncReferralPanel();
     syncCaptionHelper();
