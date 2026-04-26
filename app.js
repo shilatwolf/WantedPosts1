@@ -773,17 +773,19 @@
     _previewUrls = [];
   }
 
-  // Returns true if the browser natively supports sharing files (mobile Chrome,
-  // Safari iOS 15+). On desktop, navigator.share may exist but canShare({files})
-  // returns false — in that case we fall back to plain download.
-  //
-  // Lightweight probe is used ONLY for UI toggling (share label vs download label).
-  // The actual navigator.share call in shareFile() re-checks canShare with the
-  // real File object, which is the only reliable pre-flight check.
-  function canNativeShareFiles() {
+  // ── Device + share capability detection ──────────────
+  var IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // Probe canShare() WITH the actual file type the caller will share. iOS
+  // Safari rejects MP4 file shares based on size; Android Chrome differs
+  // for image vs video. The probe must match the actual file's MIME.
+  function canShareFiles(mimeOrFmt) {
     try {
       if (!navigator.share || !navigator.canShare) return false;
-      var probe = new File([''], 'probe.png', { type: 'image/png' });
+      var mime = mimeOrFmt || 'image/png';
+      // If a fmt key was passed, use the cached blob's mime
+      if (_resultMap[mimeOrFmt]) mime = _resultMap[mimeOrFmt].mime;
+      var probe = new File([''], 'probe.bin', { type: mime });
       return !!navigator.canShare({ files: [probe] });
     } catch (_) { return false; }
   }
@@ -795,50 +797,104 @@
     return state.messagePreset || 'Recruitment Banner';
   }
 
+  // Share caption appended only when sharing the MP4 — LinkedIn (the GIF
+  // path) doesn't accept files via the share sheet at all, so the GIF
+  // saves silently to the camera roll without text.
   function shareCaption() {
-    var head = positionHeadline();
-    var lines = ['We\'re hiring ' + head + '! Know someone great?'];
-    if (state.referralLink) lines.push(state.referralLink);
-    return lines.join('\n');
+    if (!state.referralLink) return '';
+    return state.referralLink;
   }
 
-  // CRITICAL: this function must be reachable synchronously from the click
-  // handler. navigator.share() requires the active user-activation token —
-  // any async awaits between the user gesture and the share call will
-  // invalidate the token on iOS/Safari. Blobs are pre-rendered during the
-  // Generate Package phase and cached on _resultMap so this is sync.
-  function shareFile(fmt) {
-    var entry = _resultMap[fmt];
-    if (!entry || !entry.blob) return;
-    var file = new File([entry.blob], entry.name, { type: entry.mime });
+  function triggerDownload(blob, filename) {
+    EXPORT.downloadBlob(blob, filename);
+  }
 
-    // Check canShare with the actual File object — the generic probe lies
-    // on some browsers (notably Android Chrome) that reject video files
-    // based on size/duration but accept empty probes.
-    var shareOk = navigator.share
-      && navigator.canShare
-      && navigator.canShare({ files: [file] });
-
-    if (shareOk) {
-      var text = shareCaption();
-      navigator.share({
-        files: [file],
-        title: positionHeadline(),
-        text:  text
-      }).catch(function (err) {
-        if (err && err.name === 'AbortError') return;   // user cancelled
-        console.warn('[share] navigator.share failed:', err);
-        EXPORT.downloadBlob(entry.blob, entry.name);
-      });
+  // Deep-link to LinkedIn with a graceful web fallback. Mobile apps own
+  // the linkedin:// scheme; on desktop the timeout fires and opens web.
+  function openLinkedIn() {
+    var webUrl = 'https://www.linkedin.com/feed/?shareActive=true';
+    if (IS_MOBILE) {
+      // Try the app, fall back to web after a short delay
+      var t = setTimeout(function () { window.open(webUrl, '_blank'); }, 1200);
+      try { window.location.href = 'linkedin://'; }
+      catch (_) { clearTimeout(t); window.open(webUrl, '_blank'); }
     } else {
-      EXPORT.downloadBlob(entry.blob, entry.name);
+      window.open(webUrl, '_blank');
     }
   }
 
-  function downloadFile(fmt) {
+  // ── GIF: save to gallery (LinkedIn flow) ─────────────
+  // CRITICAL: this runs synchronously from the click handler. navigator.share
+  // requires the active user-activation token; any await between the user
+  // gesture and the share call will invalidate the token on iOS/Safari.
+  // Blobs are pre-rendered during Generate Package and cached on _resultMap.
+  function saveGifToCameraRoll() {
+    var entry = _resultMap.gif11;
+    if (!entry || !entry.blob) return;
+    var file = new File([entry.blob], entry.name, { type: entry.mime });
+
+    if (canShareFiles('image/gif')) {
+      // iOS/Android share sheet gives the user the "Save to Photos" option.
+      // No text body — LinkedIn discards files anyway, this is purely a save.
+      navigator.share({ files: [file], title: positionHeadline() })
+        .then(function () { showGifSaved(); })
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          console.warn('[saveGif] share failed, falling back to download:', err);
+          triggerDownload(entry.blob, entry.name);
+          showGifSaved();
+        });
+    } else {
+      // Desktop / no share sheet — direct download (Downloads on desktop,
+      // Gallery via download intent on Android Chrome).
+      triggerDownload(entry.blob, entry.name);
+      showGifSaved();
+    }
+  }
+
+  function showGifSaved() {
+    var btn   = $('btn-save-gif');
+    var saved = $('saved-gif');
+    var tip   = $('tip-gif');
+    if (btn) {
+      btn.classList.add('is-saved');
+      btn.textContent = '✓ Saved to Camera Roll';
+    }
+    if (tip)   tip.style.display = 'none';
+    if (saved) saved.style.display = '';
+  }
+
+  // ── MP4: share to Stories (Instagram / TikTok / WhatsApp) ──
+  function shareMp4ToStories() {
+    var entry = _resultMap.video916;
+    if (!entry || !entry.blob) return;
+    var file = new File([entry.blob], entry.name, { type: entry.mime });
+
+    if (canShareFiles('video/mp4')) {
+      var data = { files: [file], title: positionHeadline() };
+      var text = shareCaption();
+      if (text) data.text = text;
+      navigator.share(data).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        console.warn('[shareMp4] failed, falling back to download:', err);
+        triggerDownload(entry.blob, entry.name);
+      });
+    } else {
+      triggerDownload(entry.blob, entry.name);
+    }
+  }
+
+  // ── Save MP4 to gallery (no share sheet — direct download) ──
+  function saveMp4ToGallery() {
+    var entry = _resultMap.video916;
+    if (!entry || !entry.blob) return;
+    triggerDownload(entry.blob, entry.name);
+  }
+
+  function downloadByFmt(fmt) {
     var entry = _resultMap[fmt];
-    if (!entry) return;
-    EXPORT.downloadBlob(entry.blob, entry.name);
+    if (!entry || !entry.blob) return;
+    triggerDownload(entry.blob, entry.name);
   }
 
   function showResults() {
@@ -896,12 +952,29 @@
       }
     }
 
-    // Toggle share button labels + caption helper based on native-share support
-    var hasShare = canNativeShareFiles();
-    elResultsSection.querySelectorAll('.results-share-btn').forEach(function (btn) {
-      btn.textContent = hasShare ? '↗ Share' : '↓ Download';
-      btn.title = hasShare ? '' : 'On mobile, this opens the share sheet directly.';
-    });
+    // ── GIF card: reset to pristine state on every fresh results render ──
+    var gifBtn   = $('btn-save-gif');
+    var gifSaved = $('saved-gif');
+    var gifTip   = $('tip-gif');
+    if (gifBtn) {
+      gifBtn.classList.remove('is-saved');
+      gifBtn.textContent = '↓ Save to Camera Roll';
+    }
+    if (gifSaved) gifSaved.style.display = 'none';
+    if (gifTip)   gifTip.style.display   = '';
+
+    // ── MP4 card: device-specific primary action ──
+    var mp4Btn = $('btn-share-mp4');
+    var mp4Tip = $('tip-mp4');
+    if (mp4Btn && mp4Tip) {
+      if (IS_MOBILE && canShareFiles('video/mp4')) {
+        mp4Btn.textContent = '↗ Share to Stories';
+        mp4Tip.textContent = 'Opens your share sheet — pick Instagram, TikTok, or WhatsApp';
+      } else {
+        mp4Btn.textContent = '↓ Download MP4';
+        mp4Tip.textContent = 'On mobile you can share directly to Instagram, TikTok, and WhatsApp';
+      }
+    }
 
     syncReferralPanel();
     syncCaptionHelper();
@@ -941,12 +1014,36 @@
 
   function wireResultsActions() {
     if (!elResultsSection) return;
-    elResultsSection.querySelectorAll('.results-share-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { shareFile(btn.dataset.fmt); });
-    });
-    elResultsSection.querySelectorAll('.results-dl-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { downloadFile(btn.dataset.fmt); });
-    });
+
+    // GIF card
+    var bSaveGif = $('btn-save-gif');
+    if (bSaveGif) bSaveGif.addEventListener('click', saveGifToCameraRoll);
+    var bOpenLi = $('btn-open-linkedin');
+    if (bOpenLi) bOpenLi.addEventListener('click', openLinkedIn);
+    var bSavedOpenLi = $('btn-saved-open-linkedin');
+    if (bSavedOpenLi) bSavedOpenLi.addEventListener('click', openLinkedIn);
+    var bDlGif = $('btn-dl-gif');
+    if (bDlGif) bDlGif.addEventListener('click', function () { downloadByFmt('gif11'); });
+
+    // MP4 card
+    var bShareMp4 = $('btn-share-mp4');
+    if (bShareMp4) bShareMp4.addEventListener('click', shareMp4ToStories);
+    var bSaveMp4 = $('btn-save-mp4-gallery');
+    if (bSaveMp4) bSaveMp4.addEventListener('click', saveMp4ToGallery);
+    var bDlMp4 = $('btn-dl-mp4');
+    if (bDlMp4) bDlMp4.addEventListener('click', function () { downloadByFmt('video916'); });
+
+    // PNG disclosure cards
+    var bSavePng11 = $('btn-save-png11');
+    if (bSavePng11) bSavePng11.addEventListener('click', function () { downloadByFmt('png11'); });
+    var bDlPng11 = $('btn-dl-png11');
+    if (bDlPng11) bDlPng11.addEventListener('click', function () { downloadByFmt('png11'); });
+    var bSavePng916 = $('btn-save-png916');
+    if (bSavePng916) bSavePng916.addEventListener('click', function () { downloadByFmt('png916'); });
+    var bDlPng916 = $('btn-dl-png916');
+    if (bDlPng916) bDlPng916.addEventListener('click', function () { downloadByFmt('png916'); });
+
+    // ZIP + restart
     var zipBtn = $('btn-results-zip');
     if (zipBtn) zipBtn.addEventListener('click', onResultsZip);
     var restartBtn = $('btn-results-restart');
@@ -997,7 +1094,7 @@
     if (!cap) return;
     // Only surface the copyable caption helper on desktop fallback (no
     // native share sheet). On mobile the share sheet delivers the caption.
-    var show = !canNativeShareFiles() && !!state.referralLink;
+    var show = !canShareFiles('video/mp4') && !!state.referralLink;
     cap.style.display = show ? '' : 'none';
     if (!show) return;
     var ta = $('results-referral-caption-text');
@@ -1035,26 +1132,28 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     DESKTOP MOBILE-RECOMMENDATION BANNER (§7)
+     MOBILE-RECOMMENDATION BANNER (Round 6)
+     Lives at the top of the results section. CSS already hides it
+     on mobile via @media; we additionally honour a session-scoped
+     dismiss so it doesn't keep nagging after the user closed it.
   ══════════════════════════════════════════════════════════ */
-  function wireDesktopBanner() {
-    var banner = $('desktop-banner');
+  function wireMobileBanner() {
+    var banner = $('mobile-banner');
     if (!banner) return;
     var dismissed = false;
-    try { dismissed = sessionStorage.getItem('desktopBannerDismissed') === '1'; } catch (_) {}
-    if (dismissed) { banner.style.display = 'none'; return; }
+    try { dismissed = sessionStorage.getItem('mobile-banner-dismissed') === '1'; } catch (_) {}
+    if (dismissed || IS_MOBILE) { banner.style.display = 'none'; return; }
 
-    var copyBtn = $('desktop-banner-copy');
+    var copyBtn = $('btn-copy-tool-link');
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
         var url = window.location.href;
         var done = function () {
-          var orig = copyBtn.textContent;
           copyBtn.classList.add('copied');
           copyBtn.textContent = 'Copied!';
           setTimeout(function () {
             copyBtn.classList.remove('copied');
-            copyBtn.textContent = orig;
+            copyBtn.textContent = 'Copy link';
           }, 1600);
         };
         if (navigator.clipboard) {
@@ -1066,11 +1165,11 @@
         }
       });
     }
-    var dismissBtn = $('desktop-banner-dismiss');
+    var dismissBtn = $('btn-dismiss-banner');
     if (dismissBtn) {
       dismissBtn.addEventListener('click', function () {
         banner.style.display = 'none';
-        try { sessionStorage.setItem('desktopBannerDismissed', '1'); } catch (_) {}
+        try { sessionStorage.setItem('mobile-banner-dismissed', '1'); } catch (_) {}
       });
     }
   }
@@ -1255,7 +1354,7 @@
     wireIndicator();
     wireResultsActions();
     wireReferral();
-    wireDesktopBanner();
+    wireMobileBanner();
 
     renderWizard();
     openStep(1);

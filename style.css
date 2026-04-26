@@ -1047,53 +1047,59 @@ footer {
 }
 
 /* ════════════════════════════════════════════════════════
-   DESKTOP MOBILE-RECOMMENDATION BANNER (§7)
-   Hidden on mobile — its whole point is to nudge desktop users
-   to open the tool on their phone where navigator.share works.
+   MOBILE-RECOMMENDATION BANNER (Round 6)
+   Lives at the top of the results section. Hidden on mobile —
+   its whole point is to nudge desktop users to their phone
+   where the share-sheet integrations actually work.
    ════════════════════════════════════════════════════════ */
-.desktop-banner {
+.mobile-rec-banner {
   display:flex;
   align-items:center;
-  gap:var(--sp-300);
-  padding:var(--sp-200) var(--sp-600);
+  gap:10px;
+  padding:10px 16px;
   background:#101010;
-  border-bottom:1px solid var(--b4);
-  font-family:var(--font-body);
-  font-size:13px;
-  color:var(--t3);
-  flex-shrink:0;
+  border:1px solid #1e1e1e;
+  border-radius:6px;
+  margin-bottom:20px;
+  flex-wrap:wrap;
 }
-.desktop-banner-text { flex:1; }
-.desktop-banner-emoji { margin-right:var(--sp-200); }
-.desktop-banner-btn {
-  padding:4px 10px;
+.mobile-rec-icon { flex-shrink:0; }
+.mobile-rec-text {
+  flex:1;
+  font-size:12px;
+  color:var(--t3);
+  line-height:1.5;
+  min-width:200px;
+}
+.btn-copy-link {
   background:transparent;
-  border:1px solid var(--b3);
+  border:1px solid var(--b4);
+  border-radius:0;
   font-family:var(--font-brand);
   font-size:11px;
-  font-weight:var(--fw-med);
+  font-weight:var(--fw-bold);
   letter-spacing:var(--ls-up);
   text-transform:uppercase;
-  color:var(--t1);
+  color:var(--t3);
+  padding:6px 12px;
   cursor:pointer;
-  transition:background .15s, color .15s;
+  white-space:nowrap;
+  transition:background .15s, color .15s, border-color .15s;
 }
-.desktop-banner-btn:hover { background:var(--accent); border-color:transparent; color:#fff; }
-.desktop-banner-btn.copied { background:var(--ok-t); color:var(--tok); border-color:transparent; }
-.desktop-banner-dismiss {
-  width:24px; height:24px;
-  padding:0;
+.btn-copy-link:hover { background:var(--accent); border-color:transparent; color:#fff; }
+.btn-copy-link.copied { background:var(--ok-t); color:var(--tok); border-color:transparent; }
+.btn-dismiss {
   background:transparent;
   border:none;
-  color:var(--t3);
+  color:#505050;
   font-size:14px;
   cursor:pointer;
-  border-radius:2px;
-  transition:background .15s, color .15s;
+  padding:4px;
+  flex-shrink:0;
 }
-.desktop-banner-dismiss:hover { background:var(--s2); color:var(--t1); }
-@media (max-width: 768px) {
-  .desktop-banner { display:none; }
+.btn-dismiss:hover { color:var(--t1); }
+@media (max-width: 767px) {
+  .mobile-rec-banner { display:none !important; }
 }
 
 /* ════════════════════════════════════════════════════════
@@ -1244,7 +1250,7 @@ footer {
 }
 
 /* Groups (square / story) */
-.results-group { display:flex; flex-direction:column; gap:var(--sp-200); }
+.results-group, .results-col { display:flex; flex-direction:column; gap:var(--sp-200); }
 .results-group-label {
   font-family:var(--font-brand);
   font-size:var(--fs-300);
@@ -1382,45 +1388,133 @@ footer {
   text-transform:uppercase;
 }
 
-/* Actions row — share (fills remaining space) + labelled Save button */
+/* Actions block — primary button + tip + secondary row stacked.
+   Round 6: each card has its own action hierarchy because the
+   right action depends on the format (LinkedIn doesn't accept
+   files via the share sheet; Stories platforms do).            */
 .results-actions {
   display:flex;
-  align-items:stretch;
-  gap:var(--sp-200);
+  flex-direction:column;
+  gap:6px;
   margin-top:var(--sp-200);
 }
-.results-share-btn {
-  flex:1;
-  min-width:0;
-  justify-content:center;
-}
-.results-dl-btn {
-  flex-shrink:0;
-  min-width:96px;
-  padding:var(--sp-200) var(--sp-400);
-  display:inline-flex;
+
+/* Primary — solid accent fill, full width */
+.btn-primary {
+  width:100%;
+  height:42px;
+  background:var(--accent);
+  border:none;
+  border-radius:0;
+  font-family:var(--font-brand);
+  font-size:13px;
+  font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-up);
+  text-transform:uppercase;
+  color:#fff;
+  display:flex;
   align-items:center;
   justify-content:center;
-  gap:6px;
+  gap:8px;
+  cursor:pointer;
+  transition:opacity .15s, background .15s;
+}
+.btn-primary:hover { opacity:.88; }
+.btn-primary:active { opacity:.75; }
+.btn-primary.is-saved {
+  background:var(--tok);
+  color:#fff;
+}
+
+/* Secondary — outlined, smaller */
+.btn-secondary {
+  flex:1;
+  height:36px;
   background:transparent;
-  border:1px solid var(--b2);
+  border:1px solid var(--b4);
+  border-radius:0;
   font-family:var(--font-brand);
   font-size:11px;
   font-weight:var(--fw-bold);
   letter-spacing:var(--ls-up);
   text-transform:uppercase;
-  color:var(--tp);
+  color:var(--t3);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
   cursor:pointer;
-  transition:background .15s, border-color .15s, color .15s;
+  transition:border-color .15s, color .15s, background .15s;
 }
-.results-dl-btn:hover { background:var(--accent); border-color:transparent; color:#fff; }
-/* Ghost variant kept as alias — same style, used under PNG disclosure */
-.results-dl-ghost {
+.btn-secondary:hover { border-color:#505050; color:var(--t1); }
+
+/* Small download-icon button — paired with .btn-secondary */
+.btn-icon-dl {
+  width:36px;
+  height:36px;
   background:transparent;
-  border:1px solid var(--b2);
-  color:var(--tp);
+  border:1px solid var(--b4);
+  border-radius:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  flex-shrink:0;
+  color:var(--t3);
+  font-size:14px;
+  transition:border-color .15s, color .15s;
 }
-.results-dl-ghost:hover { background:var(--accent); border-color:transparent; color:#fff; }
+.btn-icon-dl:hover { border-color:#505050; color:var(--t1); }
+
+/* Row pairing secondary + icon-dl */
+.secondary-row {
+  display:flex;
+  gap:6px;
+  margin-top:6px;
+}
+
+/* Inline context tip below the primary button */
+.ctx-tip {
+  font-size:11px;
+  color:#606060;
+  line-height:1.5;
+  margin:0;
+  padding-left:2px;
+}
+
+/* Saved confirmation panel — replaces the tip after a successful save */
+.saved-confirmation {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  background:rgba(4,200,0,0.10);
+  border:1px solid rgba(4,200,0,0.30);
+  border-radius:4px;
+  font-family:var(--font-brand);
+  font-size:12px;
+  color:var(--tok);
+  font-weight:var(--fw-semi);
+  margin-top:6px;
+}
+.saved-confirmation .check-icon { font-weight:var(--fw-bold); }
+.saved-confirmation .saved-text { flex:1; min-width:140px; }
+.btn-open-app {
+  background:transparent;
+  border:1px solid rgba(4,200,0,0.5);
+  color:var(--tok);
+  font-family:var(--font-brand);
+  font-size:11px;
+  font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-up);
+  text-transform:uppercase;
+  padding:5px 10px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .15s;
+}
+.btn-open-app:hover { background:rgba(4,200,0,0.18); }
 
 /* PNG disclosure */
 .results-disclosure { margin-top:0; }

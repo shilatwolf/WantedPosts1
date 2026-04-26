@@ -9,16 +9,6 @@
 </head>
 <body>
 
-<!-- ── Desktop mobile-recommendation banner ──────────────── -->
-<div class="desktop-banner" id="desktop-banner">
-  <span class="desktop-banner-text">
-    <span class="desktop-banner-emoji">📱</span>
-    For the best sharing experience, open this tool on your phone.
-  </span>
-  <button class="desktop-banner-btn" id="desktop-banner-copy">Copy link</button>
-  <button class="desktop-banner-dismiss" id="desktop-banner-dismiss" aria-label="Dismiss">✕</button>
-</div>
-
 <!-- ── Nav ──────────────────────────────────────────────── -->
 <nav class="nav">
   <a class="nav-logo" href="#">
@@ -237,11 +227,21 @@
       <p class="results-subtitle" id="results-subtitle"></p>
     </header>
 
+    <!-- ── Mobile-recommendation banner (desktop only, dismissible) ── -->
+    <div class="mobile-rec-banner" id="mobile-banner">
+      <span class="mobile-rec-icon">📱</span>
+      <span class="mobile-rec-text">
+        For the best experience, open this on your phone — share directly to Instagram, TikTok, and WhatsApp.
+      </span>
+      <button class="btn-copy-link" id="btn-copy-tool-link">Copy link</button>
+      <button class="btn-dismiss" id="btn-dismiss-banner" aria-label="Dismiss">✕</button>
+    </div>
+
     <!-- ── Format groups (side-by-side on desktop) ───── -->
     <div class="results-formats-row">
 
-    <!-- ── Square format ──────────────────────────────── -->
-    <div class="results-group">
+    <!-- ── Square format — GIF for LinkedIn ───────────── -->
+    <div class="results-col" id="col-linkedin">
       <div class="results-group-label">LinkedIn · Square format</div>
 
       <article class="results-card results-card-primary" data-fmt="gif11">
@@ -251,15 +251,28 @@
         </div>
         <div class="results-card-body">
           <div class="results-format-name">1:1 Animated GIF</div>
-          <div class="results-format-desc">Best for LinkedIn feed posts</div>
+          <div class="results-format-desc">Best for LinkedIn posts</div>
           <div class="results-badges">
             <span class="results-badge">LinkedIn</span>
             <span class="results-badge">Facebook</span>
             <span class="results-badge">X / Twitter</span>
           </div>
+
           <div class="results-actions">
-            <button class="btn-p results-share-btn" data-fmt="gif11">↗ Share</button>
-            <button class="results-dl-btn" data-fmt="gif11" aria-label="Download GIF">↓ Save</button>
+            <button class="btn-primary" id="btn-save-gif">↓ Save to Camera Roll</button>
+            <p class="ctx-tip" id="tip-gif">Save to your gallery, then post on LinkedIn</p>
+
+            <!-- Shown after save succeeds -->
+            <div class="saved-confirmation" id="saved-gif" style="display:none">
+              <span class="check-icon">✓</span>
+              <span class="saved-text">Saved — open LinkedIn to post</span>
+              <button class="btn-open-app" id="btn-saved-open-linkedin">Open LinkedIn →</button>
+            </div>
+
+            <div class="secondary-row">
+              <button class="btn-secondary" id="btn-open-linkedin">Open LinkedIn</button>
+              <button class="btn-icon-dl" id="btn-dl-gif" aria-label="Download GIF">↓</button>
+            </div>
           </div>
         </div>
       </article>
@@ -273,22 +286,19 @@
           <div class="results-card-body">
             <div class="results-format-name">1:1 Static PNG</div>
             <div class="results-format-desc">Fallback for platforms that don't support animation</div>
-            <div class="results-badges">
-              <span class="results-badge">LinkedIn</span>
-              <span class="results-badge">Facebook</span>
-              <span class="results-badge">X / Twitter</span>
-            </div>
             <div class="results-actions">
-              <button class="btn-s results-share-btn" data-fmt="png11">↗ Share</button>
-              <button class="results-dl-btn results-dl-ghost" data-fmt="png11" aria-label="Download PNG">↓ Save</button>
+              <div class="secondary-row">
+                <button class="btn-secondary" id="btn-save-png11">↓ Save PNG</button>
+                <button class="btn-icon-dl" id="btn-dl-png11" aria-label="Download PNG">↓</button>
+              </div>
             </div>
           </div>
         </article>
       </details>
     </div>
 
-    <!-- ── Story format ───────────────────────────────── -->
-    <div class="results-group">
+    <!-- ── Story format — MP4 for Instagram/TikTok/WhatsApp ─ -->
+    <div class="results-col" id="col-stories">
       <div class="results-group-label">Stories · Vertical format</div>
 
       <article class="results-card results-card-primary results-card-story" data-fmt="video916">
@@ -298,15 +308,22 @@
         </div>
         <div class="results-card-body">
           <div class="results-format-name">9:16 Animated MP4</div>
-          <div class="results-format-desc">Best for Instagram, TikTok, WhatsApp statuses</div>
+          <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
           <div class="results-badges">
             <span class="results-badge">Instagram</span>
             <span class="results-badge">TikTok</span>
             <span class="results-badge">WhatsApp</span>
           </div>
+
           <div class="results-actions">
-            <button class="btn-p results-share-btn" data-fmt="video916">↗ Share</button>
-            <button class="results-dl-btn" data-fmt="video916" aria-label="Download MP4">↓ Save</button>
+            <!-- Label set by JS based on device -->
+            <button class="btn-primary" id="btn-share-mp4">Share to Stories</button>
+            <p class="ctx-tip" id="tip-mp4">Opens your share sheet — pick Instagram, TikTok, or WhatsApp</p>
+
+            <div class="secondary-row">
+              <button class="btn-secondary" id="btn-save-mp4-gallery">Save to Camera Roll</button>
+              <button class="btn-icon-dl" id="btn-dl-mp4" aria-label="Download MP4">↓</button>
+            </div>
           </div>
         </div>
       </article>
@@ -320,14 +337,11 @@
           <div class="results-card-body">
             <div class="results-format-name">9:16 Static PNG</div>
             <div class="results-format-desc">Fallback for platforms that don't support animation</div>
-            <div class="results-badges">
-              <span class="results-badge">Instagram</span>
-              <span class="results-badge">TikTok</span>
-              <span class="results-badge">WhatsApp</span>
-            </div>
             <div class="results-actions">
-              <button class="btn-s results-share-btn" data-fmt="png916">↗ Share</button>
-              <button class="results-dl-btn results-dl-ghost" data-fmt="png916" aria-label="Download PNG">↓ Save</button>
+              <div class="secondary-row">
+                <button class="btn-secondary" id="btn-save-png916">↓ Save PNG</button>
+                <button class="btn-icon-dl" id="btn-dl-png916" aria-label="Download PNG">↓</button>
+              </div>
             </div>
           </div>
         </article>
