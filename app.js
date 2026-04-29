@@ -108,17 +108,12 @@
   var elBrandGrid  = $('brand-grid');
   var elImageGrid  = $('image-grid');
   var elPresetGrid = $('preset-grid');
-  var elPresetMode = $('preset-mode');
-  var elPosMode    = $('pos-mode');
   var elCtaGrid    = $('cta-grid');
   var elSubChips   = $('sublabel-chips');
   var elSubOtherWrap  = $('sublabel-other-wrap');
   var elSubOtherInput = $('sublabel-other-input');
 
   var elBtnExport  = $('btn-export');
-  var elProgressWrap  = $('progress-wrap');
-  var elProgressFill  = $('progress-fill');
-  var elProgressLabel = $('progress-label');
   /* ── Accent CSS variables ─────────────────────────────── */
   function setAccent(brand) {
     var b = brand ? BRANDS[brand] : { accent: '#D34037', accentHover: '#F05C48' };
@@ -268,8 +263,7 @@
     state.subLabel        = [];
     state.smartSuggestions = [];
     CANVAS.resetSeeds();
-    syncReferralNudge();
-    renderPositionDetail(null);
+    syncStickyPosBar();
 
     setAccent(key);
     syncBrandGrid();
@@ -372,15 +366,14 @@
     syncImageGrid();
     renderWizard();
     mfSyncContinueButtons();
-    mfMaybeAutoAdvance(2);
+    // Round 8: no auto-advance. User stays on Step 2 to browse visuals,
+    // taps "Use this visual →" when ready.
 
-    // Start loading data URL shims in parallel (non-blocking for preview)
     _imageDataReady = Promise.all([
       loadDataScript(img.dataScript11),
       loadDataScript(img.dataScript916)
     ]);
 
-    // Prewarm preview, then render
     CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
 
@@ -405,49 +398,37 @@
   }
 
   function clearPreset() {
-    elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+    if (elPresetGrid) elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
       el.classList.remove('selected');
     });
-    var posGrid = $('pos-grid');
-    if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
+    var list = $('pos-acc-list');
+    if (list) list.querySelectorAll('.pos-acc-row').forEach(function (el) {
       el.classList.remove('selected');
     });
-    state.messagePreset   = null;
-    state.messagePosition = '';
-  }
-
-  function onPresetSelect(text) {
-    state.messagePreset = text;
-    elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
-      el.classList.toggle('selected', el.dataset.value === text);
-    });
-    renderWizard();
-    mfSyncContinueButtons();
-    mfMaybeAutoAdvance(3);
-    // No advance() — consistent with position-text input; user moves on at their own pace.
-    scheduleRender();
-  }
-
-  function onModeToggle(mode) {
-    state.messageMode = mode;
     state.messagePreset   = null;
     state.messagePosition = '';
     state.positionRef     = null;
-    syncReferralNudge();
-    renderPositionDetail(null);
-    var posGrid = $('pos-grid');
-    if (posGrid) posGrid.querySelectorAll('.pos-chip').forEach(function (el) {
+    syncStickyPosBar();
+  }
+
+  function onPresetSelect(text) {
+    // Selecting a preset switches into preset mode and clears position
+    state.messageMode     = 'preset';
+    state.messagePreset   = text;
+    state.messagePosition = '';
+    state.positionRef     = null;
+
+    if (elPresetGrid) elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+      el.classList.toggle('selected', el.dataset.value === text);
+    });
+    var list = $('pos-acc-list');
+    if (list) list.querySelectorAll('.pos-acc-row').forEach(function (el) {
       el.classList.remove('selected');
     });
-
-    document.querySelectorAll('.radio-btn').forEach(function (el) {
-      el.classList.toggle('active', el.dataset.mode === mode);
-    });
-
-    if (elPresetMode) elPresetMode.classList.toggle('hidden',  mode !== 'preset');
-    if (elPosMode)    elPosMode.classList.toggle('visible', mode === 'position');
+    syncStickyPosBar();
 
     renderWizard();
+    mfSyncContinueButtons();
     scheduleRender();
   }
 
@@ -470,6 +451,7 @@
       el.classList.remove('selected');
     });
     state.cta = null;
+    syncCtaRequired();
   }
 
   function onCTASelect(text) {
@@ -478,9 +460,8 @@
       el.classList.toggle('selected', el.dataset.value === text);
     });
     renderWizard();
-    // Step 4 doesn't auto-advance (notes are multi-select / optional).
-    // The "Preview" button stays manual. But we still keep continues in sync.
     mfSyncContinueButtons();
+    syncCtaRequired();
     scheduleRender();
   }
 
@@ -646,41 +627,14 @@
     if (fn) fn.disabled = !!locked;
   }
 
-  function _runExport() {
-    elBtnExport.style.display    = 'none';
-    elProgressWrap.style.display = 'flex';
-    setWizardLocked(true);
-
-    EXPORT.generateBlobs(state, function (pct, label) {
-      elProgressFill.style.width  = pct + '%';
-      elProgressLabel.textContent = label || '';
-    })
-    .then(function (blobs) {
-      _resultBlobs = blobs;
-      _resultVideoMime = blobs.videoResult ? (blobs.videoResult.blob.type || '') : '';
-      elProgressWrap.style.display = 'none';
-      showResults();
-    })
-    .catch(function (err) {
-      console.error('[EXPORT]', err);
-      setWizardLocked(false);
-      elProgressWrap.style.display = 'flex';
-      elProgressLabel.textContent  = '✗ ' + (err && err.message ? err.message : 'Export failed');
-      elProgressLabel.style.color  = 'var(--terr)';
-      setTimeout(function () {
-        elProgressWrap.style.display = 'none';
-        elBtnExport.style.display    = '';
-        elProgressLabel.style.color  = '';
-      }, 4000);
-    });
-  }
-
+  // Round 8: Preview & Save advances directly to the results screen.
+  // PNG saves are instant (live canvas → toBlob). The animated GIF + MP4
+  // pipeline only runs on demand when the user opts in.
   function onExport() {
     if (!allComplete()) return;
-    setWizardLocked(true);
-    elProgressWrap.style.display = 'flex';
-    elProgressLabel.textContent  = 'Preparing image data…';
-    _imageDataReady.then(function () { _runExport(); });
+    _imageDataReady.then(function () {
+      showResults();
+    });
   }
 
   /* ── Start over ──────────────────────────────────────── */
@@ -696,8 +650,7 @@
     state.cta             = null;
     state.subLabel        = [];
     state.smartSuggestions = [];
-    syncReferralNudge();
-    renderPositionDetail(null);
+    syncStickyPosBar();
     CANVAS.resetSeeds();
     setAccent(null);
 
@@ -708,17 +661,12 @@
     clearCTA();
     clearSubLabel();
 
-    // Reset mode toggle UI — position is default
-    document.querySelectorAll('.radio-btn').forEach(function (el) {
-      el.classList.toggle('active', el.dataset.mode === 'position');
-    });
-    if (elPresetMode) elPresetMode.classList.add('hidden');
-    if (elPosMode)    elPosMode.classList.add('visible');
+    // Close general-copy disclosure
+    var disc = $('gen-copy-disclosure');
+    if (disc) disc.removeAttribute('open');
 
     setWizardLocked(false);
-    elProgressWrap.style.display = 'none';
     elBtnExport.style.display    = '';
-    elProgressLabel.style.color  = '';
 
     renderWizard();
     openStep(1);
@@ -750,17 +698,14 @@
     _resultMap = {};
     if (!_resultBlobs) return;
     var base = filenameBase();
-    _resultMap.gif11  = { blob: _resultBlobs.gif11,  mime: 'image/gif',  name: base + '-1x1.gif'  };
-    _resultMap.png11  = { blob: _resultBlobs.png11,  mime: 'image/png',  name: base + '-1x1.png'  };
-    _resultMap.png916 = { blob: _resultBlobs.png916, mime: 'image/png',  name: base + '-9x16.png' };
-    // Video pipeline only produces MP4 now — webm is no longer an accepted
-    // output. If videoResult is null the video card renders in an error
-    // state (see showResults). Never hand users a .webm file.
+    if (_resultBlobs.gif11)  _resultMap.gif11  = { blob: _resultBlobs.gif11,  mime: 'image/gif',  name: base + '-1x1.gif'  };
+    if (_resultBlobs.png11)  _resultMap.png11  = { blob: _resultBlobs.png11,  mime: 'image/png',  name: base + '-1x1.png'  };
+    if (_resultBlobs.png916) _resultMap.png916 = { blob: _resultBlobs.png916, mime: 'image/png',  name: base + '-9x16.png' };
     if (_resultBlobs.videoResult && _resultBlobs.videoResult.blob &&
         _resultBlobs.videoResult.ext === 'mp4') {
       _resultMap.video916 = {
         blob: _resultBlobs.videoResult.blob,
-        mime: 'video/mp4',   // canonical top-level MIME (navigator.share fussy)
+        mime: 'video/mp4',
         name: base + '-9x16.mp4',
         ext:  'mp4'
       };
@@ -849,176 +794,208 @@
     }
   }
 
-  // ── GIF: save to gallery (LinkedIn flow) ─────────────
-  // CRITICAL: this runs synchronously from the click handler. navigator.share
-  // requires the active user-activation token; any await between the user
-  // gesture and the share call will invalidate the token on iOS/Safari.
-  // Blobs are pre-rendered during Generate Package and cached on _resultMap.
-  function saveGifToCameraRoll() {
-    var entry = _resultMap.gif11;
-    if (!entry || !entry.blob) return;
-    var file = new File([entry.blob], entry.name, { type: entry.mime });
-
-    if (canShareFiles('image/gif')) {
-      // iOS/Android share sheet gives the user the "Save to Photos" option.
-      // No text body — LinkedIn discards files anyway, this is purely a save.
-      navigator.share({ files: [file], title: positionHeadline() })
-        .then(function () { showGifSaved(); })
-        .catch(function (err) {
-          if (err && err.name === 'AbortError') return;
-          console.warn('[saveGif] share failed, falling back to download:', err);
-          triggerDownload(entry.blob, entry.name);
-          showGifSaved();
-        });
-    } else {
-      // Desktop / no share sheet — direct download (Downloads on desktop,
-      // Gallery via download intent on Android Chrome).
-      triggerDownload(entry.blob, entry.name);
-      showGifSaved();
-    }
-  }
-
-  function showGifSaved() {
-    var btn   = $('btn-save-gif');
-    var saved = $('saved-gif');
-    var tip   = $('tip-gif');
-    if (btn) {
-      btn.classList.add('is-saved');
-      btn.textContent = savedLabel();   // "✓ Saved to Camera Roll" or "✓ Saved"
-    }
-    // Hide the original tip and show the device-aware confirmation panel.
-    if (tip) tip.style.display = 'none';
-    if (saved) {
-      saved.style.display = '';
-      var savedText = saved.querySelector('.saved-text');
-      if (savedText) savedText.textContent = gifSavedTip();
-    }
-  }
-
-  // ── MP4: share to Stories (Instagram / TikTok / WhatsApp) ──
-  function shareMp4ToStories() {
-    var entry = _resultMap.video916;
-    if (!entry || !entry.blob) return;
-    var file = new File([entry.blob], entry.name, { type: entry.mime });
-
-    if (canShareFiles('video/mp4')) {
-      var data = { files: [file], title: positionHeadline() };
-      var text = shareCaption();
-      if (text) data.text = text;
-      navigator.share(data).catch(function (err) {
-        if (err && err.name === 'AbortError') return;
-        console.warn('[shareMp4] failed, falling back to download:', err);
-        triggerDownload(entry.blob, entry.name);
-      });
-    } else {
-      triggerDownload(entry.blob, entry.name);
-    }
-  }
-
-  // ── Save MP4 to gallery (no share sheet — direct download) ──
-  function saveMp4ToGallery() {
-    var entry = _resultMap.video916;
-    if (!entry || !entry.blob) return;
-    triggerDownload(entry.blob, entry.name);
-  }
-
   function downloadByFmt(fmt) {
     var entry = _resultMap[fmt];
     if (!entry || !entry.blob) return;
     triggerDownload(entry.blob, entry.name);
   }
 
+  // Round 8: capture a still PNG from the live canvas. This runs the
+  // canvas through stillFrameState so animation noise (smoke, CTA pulse)
+  // doesn't leak into the saved image.
+  function capturePng(is916) {
+    return new Promise(function (resolve, reject) {
+      var oc  = document.createElement('canvas');
+      var s   = is916 ? CANVAS.S916 : CANVAS.S11;
+      oc.width = s.w; oc.height = s.h;
+      var ctx = oc.getContext('2d');
+      var fs  = { msgOpacity: 1, msgYOffset: 0, ctaPulse: 0, t: 1.333 };
+      CANVAS.renderToCtx(ctx, s, state, 20, fs, is916, true)
+        .then(function () {
+          oc.toBlob(function (blob) {
+            if (blob) resolve(blob);
+            else reject(new Error('toBlob failed'));
+          }, 'image/png');
+        })
+        .catch(reject);
+    });
+  }
+
+  function flashSaved(btn, originalLabel) {
+    if (!btn) return;
+    var prev = originalLabel || btn.textContent;
+    btn.classList.add('is-saved');
+    btn.textContent = '✓ Saved';
+    setTimeout(function () {
+      btn.classList.remove('is-saved');
+      btn.textContent = prev;
+    }, 1500);
+  }
+
+  // Save a PNG: native share sheet on mobile (gives user "Save to Photos"
+  // option), direct download on desktop or share-unavailable.
+  function savePngWithShare(blob, filename, btn, originalLabel) {
+    var file = new File([blob], filename, { type: 'image/png' });
+    if (IS_MOBILE && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: positionHeadline() })
+        .then(function () { flashSaved(btn, originalLabel); })
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          triggerDownload(blob, filename);
+          flashSaved(btn, originalLabel);
+        });
+    } else {
+      triggerDownload(blob, filename);
+      flashSaved(btn, originalLabel);
+    }
+  }
+
+  function onSavePng(is916) {
+    var btn = $(is916 ? 'btn-save-png916' : 'btn-save-png11');
+    var originalLabel = btn ? btn.textContent : '';
+    var name = filenameBase() + (is916 ? '-9x16.png' : '-1x1.png');
+    capturePng(is916).then(function (blob) {
+      savePngWithShare(blob, name, btn, originalLabel);
+    }).catch(function (err) {
+      console.error('[savePng]', err);
+    });
+  }
+
+  // GIF — save (LinkedIn flow). Opens share sheet on mobile so user can
+  // "Save to Photos"; downloads directly otherwise.
+  function onSaveGif() {
+    var entry = _resultMap.gif11;
+    if (!entry || !entry.blob) return;
+    var btn = $('btn-save-gif');
+    var orig = btn ? btn.textContent : '';
+    var file = new File([entry.blob], entry.name, { type: entry.mime });
+    if (IS_MOBILE && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: positionHeadline() })
+        .then(function () { flashSaved(btn, orig); })
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          triggerDownload(entry.blob, entry.name);
+          flashSaved(btn, orig);
+        });
+    } else {
+      triggerDownload(entry.blob, entry.name);
+      flashSaved(btn, orig);
+    }
+  }
+
+  // MP4 — Save / Share. On mobile with share support, opens share sheet
+  // (Instagram, TikTok, WhatsApp); otherwise direct download.
+  function onSaveMp4() {
+    var entry = _resultMap.video916;
+    if (!entry || !entry.blob) return;
+    var btn = $('btn-save-mp4');
+    var orig = btn ? btn.textContent : '';
+    var file = new File([entry.blob], entry.name, { type: entry.mime });
+    if (IS_MOBILE && navigator.canShare && navigator.canShare({ files: [file] })) {
+      var data = { files: [file], title: positionHeadline() };
+      var text = shareCaption();
+      if (text) data.text = text;
+      navigator.share(data)
+        .then(function () { flashSaved(btn, orig); })
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          triggerDownload(entry.blob, entry.name);
+          flashSaved(btn, orig);
+        });
+    } else {
+      triggerDownload(entry.blob, entry.name);
+      flashSaved(btn, orig);
+    }
+  }
+
+  // Round 8: opt-in animated generation (GIF + MP4 only, PNGs already saved).
+  function onGenerateAnimated() {
+    var btn = $('btn-generate-animated');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.innerHTML = 'Generating… <span class="bga-sub" id="bga-progress">0%</span>';
+
+    EXPORT.generateBlobs(state, function (pct, label) {
+      var sub = $('bga-progress');
+      if (sub) sub.textContent = Math.round(pct) + '% · ' + (label || '');
+    })
+      .then(function (blobs) {
+        _resultBlobs = blobs;
+        buildResultMap();
+        showAnimatedResults();
+      })
+      .catch(function (err) {
+        console.error('[animated]', err);
+        btn.disabled = false;
+        btn.innerHTML = '✗ Failed — try again<span class="bga-sub">' +
+          escapeHtml(err && err.message ? err.message : 'Unknown error') + '</span>';
+      });
+  }
+
+  function showAnimatedResults() {
+    revokePreviewUrls();
+    var animSection = $('animated-section');
+    var animResults = $('animated-results');
+    if (animSection) animSection.style.display = 'none';
+    if (animResults) animResults.style.display = '';
+
+    setPreviewImage('r8-gif-img', _resultBlobs.gif11);
+    // Static still as MP4 thumbnail (video can't render in <img>)
+    setPreviewImage('r8-mp4-img', _resultBlobs.png916);
+
+    // Hide MP4 card if pipeline failed
+    var mp4Card = document.querySelector('[data-fmt="video916"]');
+    if (mp4Card) mp4Card.style.display = _resultMap.video916 ? '' : 'none';
+  }
+
+  // Render PNG snapshots into the result preview slots so the static
+  // result cards always show a clean still (no animation noise) without
+  // needing to relocate the live canvases.
+  function renderResultPreviews() {
+    var slot11  = $('r8-preview-png11');
+    var slot916 = $('r8-preview-png916');
+    if (!slot11 && !slot916) return;
+
+    var renderInto = function (slot, blob) {
+      if (!slot || !blob) return;
+      slot.innerHTML = '';
+      var img = new Image();
+      var url = URL.createObjectURL(blob);
+      _previewUrls.push(url);
+      img.src = url;
+      slot.appendChild(img);
+    };
+
+    capturePng(false).then(function (b) { renderInto(slot11, b);  }).catch(function(){});
+    capturePng(true ).then(function (b) { renderInto(slot916, b); }).catch(function(){});
+  }
+
   function showResults() {
-    if (!_resultBlobs) return;
-    buildResultMap();
     revokePreviewUrls();
 
-    // Header
-    if (elResultsTitle)    elResultsTitle.textContent = positionHeadline();
+    if (elResultsTitle) elResultsTitle.textContent = positionHeadline();
     if (elResultsSubtitle) {
-      var brandName = state.brand ? BRANDS[state.brand].name : '';
+      var brandName   = state.brand ? BRANDS[state.brand].name : '';
       var visualLabel = state.image ? state.image.label : '';
       var bits = [];
-      if (brandName)  bits.push(brandName);
+      if (brandName)   bits.push(brandName);
       if (visualLabel) bits.push(visualLabel + ' visual');
       elResultsSubtitle.textContent = bits.join(' · ');
     }
 
-    // Previews — animated primary uses the motion blob (GIF/MP4 inline in <img>);
-    // video inside <img> isn't valid, so for story primary we use the static PNG
-    // frame-20 still as the thumbnail (the motion badge communicates "MP4").
-    setPreviewImage('sq-gif-img', _resultBlobs.gif11);
-    setPreviewImage('sq-png-img', _resultBlobs.png11);
-    setPreviewImage('st-vid-img', _resultBlobs.png916);   // static still as thumb
-    setPreviewImage('st-png-img', _resultBlobs.png916);
-
-    // Video card: MP4 is the only acceptable output. If the pipeline
-    // couldn't produce one (ffmpeg.wasm failed / not available and no
-    // native MP4 MediaRecorder), flip the card into an error state
-    // telling the user to retry or use the PNG. We NEVER hand out webm.
-    var videoCard = elResultsSection.querySelector('[data-fmt="video916"]');
-    if (videoCard) {
-      videoCard.style.display = '';
-      var hasMp4 = !!_resultMap.video916;
-      videoCard.classList.toggle('results-card-error', !hasMp4);
-
-      var badge   = videoCard.querySelector('.results-motion-badge');
-      var fname   = videoCard.querySelector('.results-format-name');
-      var fdesc   = videoCard.querySelector('.results-format-desc');
-      var actions = videoCard.querySelector('.results-actions');
-      var badges  = videoCard.querySelector('.results-badges');
-
-      if (hasMp4) {
-        if (badge)  { badge.style.display = ''; badge.lastChild.textContent = 'MP4'; }
-        if (fname)  fname.textContent = '9:16 Animated MP4';
-        if (fdesc)  fdesc.textContent = 'Best for Instagram, TikTok, WhatsApp statuses';
-        if (actions) actions.style.display = '';
-        if (badges)  badges.style.display  = '';
-      } else {
-        if (badge)  badge.style.display = 'none';
-        if (fname)  fname.textContent = '9:16 Video export failed';
-        if (fdesc)  fdesc.textContent = 'Try generating again — or use the static PNG below.';
-        if (actions) actions.style.display = 'none';
-        if (badges)  badges.style.display  = 'none';
-      }
+    // Reset the animated section back to its CTA state on every entry
+    var animSection = $('animated-section');
+    var animResults = $('animated-results');
+    if (animSection) animSection.style.display = '';
+    if (animResults) animResults.style.display = 'none';
+    var bga = $('btn-generate-animated');
+    if (bga) {
+      bga.disabled = false;
+      bga.innerHTML = '✦ Generate animated versions' +
+        '<span class="bga-sub">GIF + MP4 · takes ~15 seconds</span>';
     }
 
-    // ── GIF card: reset to pristine state on every fresh results render ──
-    var gifBtn   = $('btn-save-gif');
-    var gifSaved = $('saved-gif');
-    var gifTip   = $('tip-gif');
-    if (gifBtn) {
-      gifBtn.classList.remove('is-saved');
-      gifBtn.textContent = saveLabel(true);   // "↓ Save to Camera Roll" or "↓ Save"
-    }
-    if (gifSaved) gifSaved.style.display = 'none';
-    if (gifTip) {
-      gifTip.style.display = '';
-      gifTip.textContent   = 'Save to your gallery, then post on LinkedIn';
-    }
-
-    // ── MP4 card: device-specific primary action ──
-    var mp4Btn = $('btn-share-mp4');
-    var mp4Tip = $('tip-mp4');
-    if (mp4Btn && mp4Tip) {
-      if (IS_MOBILE && canShareFiles('video/mp4')) {
-        mp4Btn.textContent = '↗ Share to Stories';
-        mp4Tip.textContent = 'Opens your share sheet — pick Instagram, TikTok, or WhatsApp';
-      } else {
-        mp4Btn.textContent = '↓ Download MP4';
-        mp4Tip.textContent = 'On mobile you can share directly to Instagram, TikTok, and WhatsApp';
-      }
-    }
-    // MP4 card secondary "Save" + PNG cards' Save labels
-    var saveMp4Btn = $('btn-save-mp4-gallery');
-    if (saveMp4Btn) saveMp4Btn.textContent = saveLabel(false);
-    var savePng11Btn  = $('btn-save-png11');
-    if (savePng11Btn)  savePng11Btn.textContent  = '↓ ' + saveLabel(false);
-    var savePng916Btn = $('btn-save-png916');
-    if (savePng916Btn) savePng916Btn.textContent = '↓ ' + saveLabel(false);
-
-    syncReferralPanel();
-    syncCaptionHelper();
+    renderResultPreviews();
 
     elResultsSection.style.display = 'block';
     setTimeout(function () {
@@ -1056,35 +1033,19 @@
   function wireResultsActions() {
     if (!elResultsSection) return;
 
-    // GIF card
-    var bSaveGif = $('btn-save-gif');
-    if (bSaveGif) bSaveGif.addEventListener('click', saveGifToCameraRoll);
-    var bOpenLi = $('btn-open-linkedin');
-    if (bOpenLi) bOpenLi.addEventListener('click', openLinkedIn);
-    var bSavedOpenLi = $('btn-saved-open-linkedin');
-    if (bSavedOpenLi) bSavedOpenLi.addEventListener('click', openLinkedIn);
-    var bDlGif = $('btn-dl-gif');
-    if (bDlGif) bDlGif.addEventListener('click', function () { downloadByFmt('gif11'); });
-
-    // MP4 card
-    var bShareMp4 = $('btn-share-mp4');
-    if (bShareMp4) bShareMp4.addEventListener('click', shareMp4ToStories);
-    var bSaveMp4 = $('btn-save-mp4-gallery');
-    if (bSaveMp4) bSaveMp4.addEventListener('click', saveMp4ToGallery);
-    var bDlMp4 = $('btn-dl-mp4');
-    if (bDlMp4) bDlMp4.addEventListener('click', function () { downloadByFmt('video916'); });
-
-    // PNG disclosure cards
     var bSavePng11 = $('btn-save-png11');
-    if (bSavePng11) bSavePng11.addEventListener('click', function () { downloadByFmt('png11'); });
-    var bDlPng11 = $('btn-dl-png11');
-    if (bDlPng11) bDlPng11.addEventListener('click', function () { downloadByFmt('png11'); });
+    if (bSavePng11) bSavePng11.addEventListener('click', function () { onSavePng(false); });
     var bSavePng916 = $('btn-save-png916');
-    if (bSavePng916) bSavePng916.addEventListener('click', function () { downloadByFmt('png916'); });
-    var bDlPng916 = $('btn-dl-png916');
-    if (bDlPng916) bDlPng916.addEventListener('click', function () { downloadByFmt('png916'); });
+    if (bSavePng916) bSavePng916.addEventListener('click', function () { onSavePng(true); });
 
-    // ZIP + restart
+    var bGen = $('btn-generate-animated');
+    if (bGen) bGen.addEventListener('click', onGenerateAnimated);
+
+    var bSaveGif = $('btn-save-gif');
+    if (bSaveGif) bSaveGif.addEventListener('click', onSaveGif);
+    var bSaveMp4 = $('btn-save-mp4');
+    if (bSaveMp4) bSaveMp4.addEventListener('click', onSaveMp4);
+
     var zipBtn = $('btn-results-zip');
     if (zipBtn) zipBtn.addEventListener('click', onResultsZip);
     var restartBtn = $('btn-results-restart');
@@ -1099,131 +1060,21 @@
   ══════════════════════════════════════════════════════════ */
   var CAREERS_PREFIX = 'https://careers.overwolf.com/career/';
 
-  function syncReferralNudge() {
-    var nudge = $('referral-nudge');
-    if (!nudge) return;
-    var show = state.messageMode === 'position' && state.positionRef && state.positionRef.urlActivePage;
-    nudge.style.display = show ? '' : 'none';
-    if (!show) return;
-    var link = $('referral-nudge-link');
-    if (link) link.href = state.positionRef.urlActivePage;
-    var title = $('referral-nudge-title');
-    if (title) {
-      var reward = state.positionRef.referralReward;
-      title.textContent = reward
-        ? '✦ Refer someone and earn ' + reward
-        : '✦ Refer someone';
-    }
-  }
-
-  function syncReferralPanel() {
-    var panel = $('results-referral');
-    if (!panel) return;
-    var show = state.messageMode === 'position' && state.positionRef;
-    panel.style.display = show ? '' : 'none';
-    if (!show) return;
-    var link = $('results-referral-link');
-    if (link) link.href = state.positionRef.urlActivePage || '#';
-    var input = $('results-referral-input');
-    if (input) input.value = state.referralLink || '';
-    var ok = $('results-referral-ok');
-    if (ok) ok.style.display = state.referralLink ? '' : 'none';
-  }
-
-  function syncCaptionHelper() {
-    var cap = $('results-referral-caption');
-    if (!cap) return;
-    // Only surface the copyable caption helper on desktop fallback (no
-    // native share sheet). On mobile the share sheet delivers the caption.
-    var show = !canShareFiles('video/mp4') && !!state.referralLink;
-    cap.style.display = show ? '' : 'none';
-    if (!show) return;
-    var ta = $('results-referral-caption-text');
-    if (ta) ta.value = shareCaption();
-  }
-
-  function wireReferral() {
-    var input = $('results-referral-input');
-    if (input) {
-      input.addEventListener('input', function () {
-        var v = input.value.trim();
-        if (v && v.indexOf(CAREERS_PREFIX) === 0) {
-          state.referralLink = v;
-        } else {
-          state.referralLink = '';
-        }
-        var ok = $('results-referral-ok');
-        if (ok) ok.style.display = state.referralLink ? '' : 'none';
-        syncCaptionHelper();
-      });
-    }
-    var copyBtn = $('results-referral-caption-copy');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        var ta = $('results-referral-caption-text');
-        if (!ta) return;
-        ta.select();
-        try { document.execCommand('copy'); } catch (_) {}
-        if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function(){});
-        var orig = copyBtn.textContent;
-        copyBtn.textContent = '✓ Copied';
-        setTimeout(function () { copyBtn.textContent = orig; }, 1600);
-      });
-    }
-  }
-
   /* ═══════════════════════════════════════════════════════
-     MOBILE-RECOMMENDATION BANNER (Round 6)
-     Lives at the top of the results section. CSS already hides it
-     on mobile via @media; we additionally honour a session-scoped
-     dismiss so it doesn't keep nagging after the user closed it.
+     CTA mandatory enforcement (Round 8) — Step 4 button stays
+     disabled until state.cta is set. Note + button label live on
+     both desktop (#cta-required-note + #btn-export) and mobile
+     (#mf-cta-required-note + #mf-btn4).
   ══════════════════════════════════════════════════════════ */
-  function wireMobileBanner() {
-    var banner = $('mobile-banner');
-    if (!banner) return;
-    var dismissed = false;
-    try { dismissed = sessionStorage.getItem('mobile-banner-dismissed') === '1'; } catch (_) {}
-    if (dismissed || IS_MOBILE) { banner.style.display = 'none'; return; }
-
-    var copyBtn = $('btn-copy-tool-link');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        var url = window.location.href;
-        var done = function () {
-          copyBtn.classList.add('copied');
-          copyBtn.textContent = 'Copied!';
-          setTimeout(function () {
-            copyBtn.classList.remove('copied');
-            copyBtn.textContent = 'Copy link';
-          }, 1600);
-        };
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(url).then(done).catch(function () {
-            _legacyCopy(url); done();
-          });
-        } else {
-          _legacyCopy(url); done();
-        }
-      });
-    }
-    var dismissBtn = $('btn-dismiss-banner');
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', function () {
-        banner.style.display = 'none';
-        try { sessionStorage.setItem('mobile-banner-dismissed', '1'); } catch (_) {}
-      });
-    }
-  }
-
-  function _legacyCopy(text) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); } catch (_) {}
-    document.body.removeChild(ta);
+  function syncCtaRequired() {
+    var hasCta = !!state.cta;
+    [['cta-required-note',    'btn-export'],
+     ['mf-cta-required-note', 'mf-btn4']].forEach(function (pair) {
+      var note = $(pair[0]);
+      var btn  = $(pair[1]);
+      if (note) note.classList.toggle('hidden', hasCta);
+      if (btn)  btn.disabled = !hasCta;
+    });
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -1247,9 +1098,9 @@
   }
 
   function buildPositionChips() {
-    var grid = $('pos-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
+    var list = $('pos-acc-list');
+    if (!list) return;
+    list.innerHTML = '';
 
     var all = _jobsCache || [];
 
@@ -1268,42 +1119,84 @@
       msg.textContent = (_jobsCache === null)
         ? 'Loading open positions…'
         : 'No open positions right now.';
-      grid.appendChild(msg);
+      list.appendChild(msg);
       return;
     }
 
     positions.forEach(function (p) {
-      var chip = document.createElement('div');
-      chip.className = 'pos-chip';
-      chip.dataset.title = p.title;
-      chip.innerHTML =
-        '<span class="pos-chip-title">' + escapeHtml(p.title) + '</span>' +
-        (p.location ? '<span class="pos-chip-meta">' + escapeHtml(p.location) + '</span>' : '');
-      chip.addEventListener('click', function () { onPositionSelect(p); });
-      grid.appendChild(chip);
+      var row = document.createElement('div');
+      row.className = 'pos-acc-row';
+      row.dataset.title = p.title;
+
+      var head = document.createElement('div');
+      head.className = 'pos-acc-head';
+      head.innerHTML =
+        '<span class="pos-acc-title">' + escapeHtml(p.title) + '</span>' +
+        '<span class="pos-acc-caret">▶</span>';
+      head.addEventListener('click', function () { onPositionSelect(p); });
+      row.appendChild(head);
+
+      var detail = document.createElement('div');
+      detail.className = 'pos-acc-detail';
+      detail.innerHTML = buildPositionDetailHtml(p);
+      row.appendChild(detail);
+
+      list.appendChild(row);
     });
   }
 
+  function buildPositionDetailHtml(pos) {
+    var rows = [];
+    var locBits = [];
+    if (pos.city) locBits.push(pos.city);
+    var country = pos.country && COUNTRY_NAMES[pos.country] ? COUNTRY_NAMES[pos.country] : pos.country;
+    if (country) locBits.push(country);
+    if (locBits.length) rows.push({ icon: '📍', value: locBits.join(' · ') });
+
+    var deptBits = [];
+    if (pos.department) deptBits.push(pos.department);
+    if (pos.employmentType) deptBits.push(pos.employmentType);
+    if (deptBits.length) rows.push({ icon: '🏢', value: deptBits.join('  ·  ') });
+
+    if (pos.workplaceType) rows.push({ icon: '🌐', value: pos.workplaceType });
+    if (pos.isRemote)      rows.push({ icon: '🌍', value: 'Open to remote' });
+
+    var html = '<div class="pos-acc-detail-row">' +
+      rows.map(function (r) {
+        return '<span class="pos-acc-detail-item">' +
+               '<span class="pos-acc-detail-icon">' + r.icon + '</span>' +
+               '<span>' + escapeHtml(r.value) + '</span>' +
+               '</span>';
+      }).join('') +
+      '</div>';
+
+    if (pos.urlActivePage) {
+      html += '<a class="pos-acc-detail-link" href="' + escapeHtml(pos.urlActivePage) +
+              '" target="_blank" rel="noopener">View full job posting →</a>';
+    }
+    return html;
+  }
+
   function onPositionSelect(pos) {
+    // Selecting a position clears any preset selection
+    state.messageMode     = 'position';
+    state.messagePreset   = null;
     state.messagePosition = pos.title;
     state.positionRef     = pos;
-    syncReferralNudge();
-    renderPositionDetail(pos);
 
-    var grid = $('pos-grid');
-    if (grid) grid.querySelectorAll('.pos-chip').forEach(function (el) {
+    var presetGrid = $('preset-grid');
+    if (presetGrid) presetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+      el.classList.remove('selected');
+    });
+
+    syncStickyPosBar();
+
+    var list = $('pos-acc-list');
+    if (list) list.querySelectorAll('.pos-acc-row').forEach(function (el) {
       el.classList.toggle('selected', el.dataset.title === pos.title);
     });
 
-    // Surface the extracted suggestions, but DO NOT auto-apply them to
-    // state.subLabel. Comeet's workplace_type / is_remote fields are
-    // sometimes out of date — pre-selecting them would cause employees to
-    // unknowingly post inaccurate tags. Chips render in a distinct
-    // "highlighted but unselected" state and require an explicit tap.
-    //
-    // Any chips the user manually selected from a prior position stay put.
-    // If the old smart set included auto-applied chips (from the previous
-    // behaviour), clear them now so the state is consistent.
+    // Surface the extracted suggestions, but DO NOT auto-apply them.
     state.smartSuggestions.forEach(function (v) {
       var i = state.subLabel.indexOf(v);
       if (i !== -1) state.subLabel.splice(i, 1);
@@ -1314,39 +1207,21 @@
     renderWizard();
     advance();
     mfSyncContinueButtons();
-    mfMaybeAutoAdvance(3);
     scheduleRender();
   }
 
-  // Renders the compact detail strip of structured fields below the grid
-  // (location, department, employment type, experience level, workplace).
-  function renderPositionDetail(pos) {
-    var el = $('pos-detail');
-    if (!el) return;
-    if (!pos) { el.style.display = 'none'; el.innerHTML = ''; return; }
-
-    var items = [];
-    var locBits = [];
-    if (pos.city) locBits.push(pos.city);
-    var country = pos.country && COUNTRY_NAMES[pos.country] ? COUNTRY_NAMES[pos.country] : pos.country;
-    if (country) locBits.push(country);
-    if (locBits.length) items.push({ icon: '📍', value: locBits.join(', ') });
-
-    if (pos.isRemote)        items.push({ icon: '🌍', value: 'Open to remote' });
-    if (pos.department)      items.push({ icon: '🏢', value: pos.department });
-    if (pos.employmentType)  items.push({ icon: '⏳', value: pos.employmentType });
-    if (pos.experienceLevel) items.push({ icon: '👤', value: pos.experienceLevel });
-    if (pos.workplaceType)   items.push({ icon: '🌐', value: pos.workplaceType });
-
-    if (!items.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-
-    el.innerHTML = items.map(function (it) {
-      return '<span class="pos-detail-item">' +
-             '<span class="pos-detail-icon">' + it.icon + '</span>' +
-             '<span class="pos-detail-value">' + escapeHtml(it.value) + '</span>' +
-             '</span>';
-    }).join('');
-    el.style.display = '';
+  function syncStickyPosBar() {
+    var bar   = $('sticky-pos-bar');
+    var title = $('spb-title');
+    var link  = $('spb-link');
+    if (!bar) return;
+    if (state.messageMode === 'position' && state.positionRef) {
+      bar.style.display = '';
+      if (title) title.textContent = 'Selected: ' + state.positionRef.title;
+      if (link)  link.href = state.positionRef.urlActivePage || '#';
+    } else {
+      bar.style.display = 'none';
+    }
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -1380,13 +1255,41 @@
     } else {
       cur.classList.remove('active');
       cur.classList.remove('prev');
-      // The new "current" must already be at translateX(-100%) so it can
-      // slide back in from the left — give it the active class straight away.
       nxt.classList.remove('prev');
       nxt.classList.add('active');
     }
     mfStep = n;
     mfUpdateTopbar();
+    mfMountCanvasFor(n);
+
+    // Step 2 entry: auto-select first visual if none chosen yet
+    if (n === 2 && !state.image && state.brand) {
+      var firstThumb = document.querySelector('#mf-slot-image .image-thumb');
+      if (firstThumb) {
+        var poolKey = BRANDS[state.brand].imagePool;
+        var src  = (state.images && state.images[poolKey] && state.images[poolKey].length)
+                   ? state.images
+                   : (typeof IMAGES_DATA !== 'undefined' ? IMAGES_DATA : {});
+        var pool = src[poolKey] || [];
+        if (pool.length) onImageSelect(pool[0]);
+      }
+    }
+
+    // Step 5 entry: render the results UI (instant — no generation)
+    if (n === 5) {
+      _imageDataReady.then(function () {
+        showResults();
+        // Move the (now-public) results section into the mobile body so
+        // it lays out within the slide.
+        var body = $('mf-results-body');
+        if (body && elResultsSection && body !== elResultsSection.parentNode) {
+          body.appendChild(elResultsSection);
+          elResultsSection.style.display = 'block';
+        }
+        // Re-mount canvases inside the now-mounted result cards
+        mfMountCanvasFor(5);
+      });
+    }
   }
 
   function mfBack() {
@@ -1414,16 +1317,14 @@
     if (back) back.disabled = mfCurrentBackBlocked();
   }
 
-  // Enable/disable Step N's Continue button based on shared isComplete().
+  // Enable/disable each step's Continue button based on shared isComplete().
+  // Step 4's button is gated on CTA selection (Round 8 — CTA mandatory).
   function mfSyncContinueButtons() {
     if (!MF_VIEWPORT) return;
-    [1,2,3].forEach(function (n) {
+    [1,2,3,4].forEach(function (n) {
       var btn = $('mf-btn' + n);
       if (btn) btn.disabled = !isComplete(n);
     });
-    // Step 4 ("Preview") is always enabled — it just slides forward;
-    // the user selected a CTA when they tapped a chip, but if not we'll
-    // show the Generate state and they can still go back.
   }
 
   // Auto-advance after a 250ms beat so users see the chip light up before
@@ -1443,19 +1344,11 @@
   function mfRestart() {
     onRestart();         // clears state + resets desktop wizard
     mfGo(1);
-    var body = $('mf-results-body');
-    if (body) body.innerHTML =
-      '<button class="ms-next" id="mf-generate-btn">✦ Generate Package</button>' +
-      '<p class="mf-gen-note">Takes ~15 seconds. Share directly from here.</p>';
-    var foot = $('mf-step5-foot');
-    if (foot) foot.style.display = 'none';
-    mfWireGenerateBtn();
     mfSyncContinueButtons();
   }
 
-  // Move the existing wizard grids into mobile slots.  This preserves
-  // every event listener already attached — no rebinding, no duplicate
-  // chips, just relocation.  Runs once at init() when in mobile viewport.
+  // Round 8 mobile relocation. The 1:1 canvas moves between steps 2, 4
+  // and 5 (in the result PNG card). Step 3 has no preview — focused list.
   function mfRelocateNodes() {
     if (!MF_VIEWPORT) return;
     document.body.classList.add('mf-active');
@@ -1466,90 +1359,52 @@
     var slot1 = $('mf-slot-brand');
     if (brand && slot1) slot1.appendChild(brand);
 
-    // Step 2 — image grid
+    // Step 2 — image grid (preview host populated on step transition)
     var img = $('image-grid');
     var slot2 = $('mf-slot-image');
     if (img && slot2) slot2.appendChild(img);
 
-    // Step 3 — message: mode toggle + position chips + preset chips
+    // Step 3 — entire pos accordion + general copy disclosure
     var slot3 = $('mf-slot-message');
     if (slot3) {
-      var modeRow = document.querySelector('.msg-mode-row');
-      if (modeRow) slot3.appendChild(modeRow);
-      var posMode = $('pos-mode');
-      if (posMode) slot3.appendChild(posMode);
-      var presetMode = $('preset-mode');
-      if (presetMode) slot3.appendChild(presetMode);
+      var liveHint = document.querySelector('.pos-live-hint');
+      if (liveHint) slot3.appendChild(liveHint);
+      var posList = $('pos-acc-list');
+      if (posList) slot3.appendChild(posList);
+      var stickyBar = $('sticky-pos-bar');
+      if (stickyBar) slot3.appendChild(stickyBar);
+      var genCopy = $('gen-copy-disclosure');
+      if (genCopy) slot3.appendChild(genCopy);
     }
 
-    // Step 4 — action: CTA grid + sublabel section
+    // Step 4 — CTA grid + sublabel section
     var slot4 = $('mf-slot-action');
     if (slot4) {
       var cta = $('cta-grid');
       if (cta) slot4.appendChild(cta);
+      var ctaNote = $('cta-required-note');
+      // Desktop note element no longer needed — mobile has its own
+      if (ctaNote) ctaNote.remove();
       var sub = document.querySelector('.sublabel-section');
       if (sub) slot4.appendChild(sub);
     }
 
-    // Step 5 preview strip — move the live canvases here so CANVAS.render
-    // keeps drawing them and the user sees the preview as they progress.
-    // Each canvas is wrapped in a .canvas-wrap whose first child is the
-    // canvas itself; we move the wraps so the canvas labels travel along
-    // even though we hide them via CSS in the strip.
-    var strip = $('mf-preview-strip');
-    if (strip) {
-      var c11  = $('canvas-11');
-      var c916 = $('canvas-916');
-      var w11  = c11  && c11.parentElement;
-      var w916 = c916 && c916.parentElement;
-      if (w11)  strip.appendChild(w11);
-      if (w916) strip.appendChild(w916);
+    // Position canvases into the active step's preview host on first show.
+    mfMountCanvasFor(mfStep);
+  }
+
+  // Move canvas-11 into the active step's preview host (Step 2 / 4).
+  // Other steps don't show a live preview.
+  function mfMountCanvasFor(step) {
+    if (!MF_VIEWPORT) return;
+    var c11 = $('canvas-11');
+    if (!c11) return;
+
+    if (step === 2 || step === 4) {
+      var host = $('mf-preview-host-' + step);
+      if (host && c11.parentElement !== host) host.appendChild(c11);
     }
-  }
-
-  function mfWireGenerateBtn() {
-    var btn = $('mf-generate-btn');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      if (!allComplete()) return;
-      btn.disabled = true;
-      btn.textContent = 'Generating…';
-      // Keep the existing pipeline — onExport handles state, progress,
-      // and showResults() at the end. We watch for the results section
-      // becoming visible to slot it into the mobile body.
-      _mfWaitForResults();
-      onExport();
-    });
-  }
-
-  function _mfWaitForResults() {
-    var src = elResultsSection;
-    if (!src) return;
-    // MutationObserver fires when showResults() flips display to 'block'.
-    var obs = new MutationObserver(function () {
-      if (getComputedStyle(src).display !== 'none') {
-        obs.disconnect();
-        mfMountResults();
-      }
-    });
-    obs.observe(src, { attributes: true, attributeFilter: ['style', 'class'] });
-    // Also poll briefly in case the observer misses (e.g. style was already block)
-    setTimeout(function () {
-      if (getComputedStyle(src).display !== 'none') { obs.disconnect(); mfMountResults(); }
-    }, 100);
-  }
-
-  function mfMountResults() {
-    var body = $('mf-results-body');
-    var src  = elResultsSection;
-    if (!body || !src) return;
-    body.innerHTML = '';
-    body.appendChild(src);
-    src.style.display = 'block';
-    var foot = $('mf-step5-foot');
-    if (foot) foot.style.display = 'block';
-    var subtitle = $('mf-result-sub');
-    if (subtitle) subtitle.textContent = 'Tap to share or save';
+    scheduleRender();
   }
 
   function mfWireUI() {
@@ -1561,7 +1416,6 @@
     });
     var restart = $('mf-restart-btn');
     if (restart) restart.addEventListener('click', mfRestart);
-    mfWireGenerateBtn();
   }
 
   function initMobileFlow() {
@@ -1592,13 +1446,7 @@
     buildSubLabelChips();
     fetchJobs();
 
-    // Mode toggle buttons
-    document.querySelectorAll('.radio-btn').forEach(function (el) {
-      el.addEventListener('click', function () { onModeToggle(el.dataset.mode); });
-    });
-
-    // Sub-label other input — keeps the custom free-text in sync with the
-    // subLabel array (replaces the previous custom entry if present).
+    // Sub-label other input
     if (elSubOtherInput) {
       elSubOtherInput.addEventListener('input', function () {
         if (_customSubLabel) {
@@ -1611,7 +1459,7 @@
       });
     }
 
-    // Export button
+    // Preview & Save (formerly Generate Package)
     if (elBtnExport) {
       elBtnExport.addEventListener('click', onExport);
     }
@@ -1619,8 +1467,8 @@
     wireStepHeaders();
     wireIndicator();
     wireResultsActions();
-    wireReferral();
-    wireMobileBanner();
+
+    syncCtaRequired();
 
     renderWizard();
     openStep(1);
