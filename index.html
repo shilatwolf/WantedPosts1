@@ -217,6 +217,89 @@
 
 </div><!-- /tool-wrap -->
 
+<!-- ══════════════════════════════════════════════════════════
+     MOBILE FLOW (≤768px only — desktop layout above untouched)
+     The wizard grids (brand/image/message/action) are *moved*
+     into the slots below on mobile so all existing event
+     handlers and state logic keep working as-is.
+     ═══════════════════════════════════════════════════════ -->
+<div class="mobile-flow" id="mobile-flow" aria-hidden="true">
+
+  <div class="mf-topbar">
+    <div class="mf-progress"><div class="mf-progress-fill" id="mf-progress-fill"></div></div>
+    <div class="mf-topbar-inner">
+      <button class="mf-back-btn" id="mf-back-btn" aria-label="Back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <span class="mf-step-label" id="mf-step-label">Step 1 of 4</span>
+      <div class="mf-spacer"></div>
+    </div>
+  </div>
+
+  <div class="mf-track" id="mf-track">
+
+    <!-- Step 1 — Brand -->
+    <div class="mobile-step active" id="mf-s1">
+      <div class="ms-hd">
+        <h2 class="ms-title">Choose brand</h2>
+        <p class="ms-sub">Which brand is this post for?</p>
+      </div>
+      <div class="ms-body" id="mf-slot-brand"></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn1" disabled>Continue</button></div>
+    </div>
+
+    <!-- Step 2 — Visual -->
+    <div class="mobile-step" id="mf-s2">
+      <div class="ms-hd">
+        <h2 class="ms-title">Choose a visual</h2>
+        <p class="ms-sub">Pick the background for your banner</p>
+      </div>
+      <div class="ms-body" id="mf-slot-image"></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn2" disabled>Continue</button></div>
+    </div>
+
+    <!-- Step 3 — Message -->
+    <div class="mobile-step" id="mf-s3">
+      <div class="ms-hd">
+        <h2 class="ms-title">Choose your message</h2>
+        <p class="ms-sub">A position or general copy</p>
+      </div>
+      <div class="ms-body" id="mf-slot-message"></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn3" disabled>Continue</button></div>
+    </div>
+
+    <!-- Step 4 — Action + notes -->
+    <div class="mobile-step" id="mf-s4">
+      <div class="ms-hd">
+        <h2 class="ms-title">Action + notes</h2>
+        <p class="ms-sub">Choose your CTA and optional details</p>
+      </div>
+      <div class="ms-body" id="mf-slot-action"></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn4">Preview</button></div>
+    </div>
+
+    <!-- Step 5 — Generate + Results -->
+    <div class="mobile-step" id="mf-s5">
+      <div class="ms-hd">
+        <h2 class="ms-title" id="mf-result-title">Your banners</h2>
+        <p class="ms-sub" id="mf-result-sub">Ready to share</p>
+      </div>
+      <div class="mf-preview-strip" id="mf-preview-strip"></div>
+      <div class="ms-body" id="mf-results-body">
+        <button class="ms-next" id="mf-generate-btn">✦ Generate Package</button>
+        <p class="mf-gen-note">Takes ~15 seconds. Share directly from here.</p>
+      </div>
+      <div class="ms-foot" id="mf-step5-foot" style="display:none">
+        <button class="ms-restart" id="mf-restart-btn">↑ Start Over</button>
+      </div>
+    </div>
+
+  </div><!-- /mf-track -->
+</div><!-- /mobile-flow -->
+
 <!-- ── Results section (revealed after Generate Package) ─── -->
 <section class="results-section" id="results-section" style="display:none" aria-live="polite">
   <div class="results-inner">

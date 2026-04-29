@@ -281,6 +281,8 @@
 
     renderWizard();
     advance();
+    mfSyncContinueButtons();
+    mfMaybeAutoAdvance(1);
     // Prewarm first (fetches SVG logo), then render so the logo is ready
     CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
@@ -369,6 +371,8 @@
     CANVAS.resetSeeds();
     syncImageGrid();
     renderWizard();
+    mfSyncContinueButtons();
+    mfMaybeAutoAdvance(2);
 
     // Start loading data URL shims in parallel (non-blocking for preview)
     _imageDataReady = Promise.all([
@@ -418,6 +422,8 @@
       el.classList.toggle('selected', el.dataset.value === text);
     });
     renderWizard();
+    mfSyncContinueButtons();
+    mfMaybeAutoAdvance(3);
     // No advance() — consistent with position-text input; user moves on at their own pace.
     scheduleRender();
   }
@@ -472,6 +478,9 @@
       el.classList.toggle('selected', el.dataset.value === text);
     });
     renderWizard();
+    // Step 4 doesn't auto-advance (notes are multi-select / optional).
+    // The "Preview" button stays manual. But we still keep continues in sync.
+    mfSyncContinueButtons();
     scheduleRender();
   }
 
@@ -1304,6 +1313,8 @@
 
     renderWizard();
     advance();
+    mfSyncContinueButtons();
+    mfMaybeAutoAdvance(3);
     scheduleRender();
   }
 
@@ -1336,6 +1347,229 @@
              '</span>';
     }).join('');
     el.style.display = '';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     MOBILE FLOW (Round 7)
+     Reuses the existing wizard grids by physically moving them
+     into per-step slots. All event handlers and state-setting
+     logic continue to work as-is since we only relocate nodes.
+  ══════════════════════════════════════════════════════════ */
+  // Decided once at load — desktop users never see the mobile flow even
+  // if they resize. Avoids brittle DOM swap on viewport changes.
+  var MF_VIEWPORT = window.matchMedia('(max-width: 768px)').matches;
+  var MF_STEPS    = 5;
+  var mfStep      = 1;
+
+  // Back is hidden on Step 1 (nothing to go back to) — visible on every
+  // other step so users can tweak previous selections before/after generating.
+  function mfCurrentBackBlocked() { return mfStep === 1; }
+
+  function mfGo(n) {
+    if (n < 1 || n > MF_STEPS) return;
+    var cur = $('mf-s' + mfStep);
+    var nxt = $('mf-s' + n);
+    if (!cur || !nxt) return;
+    if (n === mfStep) return;
+
+    if (n > mfStep) {
+      cur.classList.remove('active');
+      cur.classList.add('prev');
+      nxt.classList.remove('prev');
+      nxt.classList.add('active');
+    } else {
+      cur.classList.remove('active');
+      cur.classList.remove('prev');
+      // The new "current" must already be at translateX(-100%) so it can
+      // slide back in from the left — give it the active class straight away.
+      nxt.classList.remove('prev');
+      nxt.classList.add('active');
+    }
+    mfStep = n;
+    mfUpdateTopbar();
+  }
+
+  function mfBack() {
+    if (mfStep > 1 && mfStep <= MF_STEPS) mfGo(mfStep - 1);
+  }
+  function mfNext() {
+    if (mfStep < MF_STEPS) mfGo(mfStep + 1);
+  }
+
+  function mfUpdateTopbar() {
+    var label = $('mf-step-label');
+    var fill  = $('mf-progress-fill');
+    var back  = $('mf-back-btn');
+
+    if (label) {
+      label.textContent = mfStep < MF_STEPS
+        ? 'Step ' + mfStep + ' of ' + (MF_STEPS - 1)
+        : '✦ Your package';
+    }
+    if (fill) {
+      fill.style.width = (mfStep / MF_STEPS * 100) + '%';
+      var accent = (BRANDS[state.brand] || {}).accent || '#D34037';
+      fill.style.background = accent;
+    }
+    if (back) back.disabled = mfCurrentBackBlocked();
+  }
+
+  // Enable/disable Step N's Continue button based on shared isComplete().
+  function mfSyncContinueButtons() {
+    if (!MF_VIEWPORT) return;
+    [1,2,3].forEach(function (n) {
+      var btn = $('mf-btn' + n);
+      if (btn) btn.disabled = !isComplete(n);
+    });
+    // Step 4 ("Preview") is always enabled — it just slides forward;
+    // the user selected a CTA when they tapped a chip, but if not we'll
+    // show the Generate state and they can still go back.
+  }
+
+  // Auto-advance after a 250ms beat so users see the chip light up before
+  // sliding to the next screen. Steps 1–3 only; Step 4 stays manual.
+  var _mfAutoAdvanceTimer = null;
+  function mfMaybeAutoAdvance(forStep) {
+    if (!MF_VIEWPORT) return;
+    if (mfStep !== forStep) return;
+    if (forStep >= 4) return;
+    if (!isComplete(forStep)) return;
+    clearTimeout(_mfAutoAdvanceTimer);
+    _mfAutoAdvanceTimer = setTimeout(function () {
+      if (mfStep === forStep) mfNext();
+    }, 250);
+  }
+
+  function mfRestart() {
+    onRestart();         // clears state + resets desktop wizard
+    mfGo(1);
+    var body = $('mf-results-body');
+    if (body) body.innerHTML =
+      '<button class="ms-next" id="mf-generate-btn">✦ Generate Package</button>' +
+      '<p class="mf-gen-note">Takes ~15 seconds. Share directly from here.</p>';
+    var foot = $('mf-step5-foot');
+    if (foot) foot.style.display = 'none';
+    mfWireGenerateBtn();
+    mfSyncContinueButtons();
+  }
+
+  // Move the existing wizard grids into mobile slots.  This preserves
+  // every event listener already attached — no rebinding, no duplicate
+  // chips, just relocation.  Runs once at init() when in mobile viewport.
+  function mfRelocateNodes() {
+    if (!MF_VIEWPORT) return;
+    document.body.classList.add('mf-active');
+    document.getElementById('mobile-flow').setAttribute('aria-hidden', 'false');
+
+    // Step 1 — brand grid
+    var brand = $('brand-grid');
+    var slot1 = $('mf-slot-brand');
+    if (brand && slot1) slot1.appendChild(brand);
+
+    // Step 2 — image grid
+    var img = $('image-grid');
+    var slot2 = $('mf-slot-image');
+    if (img && slot2) slot2.appendChild(img);
+
+    // Step 3 — message: mode toggle + position chips + preset chips
+    var slot3 = $('mf-slot-message');
+    if (slot3) {
+      var modeRow = document.querySelector('.msg-mode-row');
+      if (modeRow) slot3.appendChild(modeRow);
+      var posMode = $('pos-mode');
+      if (posMode) slot3.appendChild(posMode);
+      var presetMode = $('preset-mode');
+      if (presetMode) slot3.appendChild(presetMode);
+    }
+
+    // Step 4 — action: CTA grid + sublabel section
+    var slot4 = $('mf-slot-action');
+    if (slot4) {
+      var cta = $('cta-grid');
+      if (cta) slot4.appendChild(cta);
+      var sub = document.querySelector('.sublabel-section');
+      if (sub) slot4.appendChild(sub);
+    }
+
+    // Step 5 preview strip — move the live canvases here so CANVAS.render
+    // keeps drawing them and the user sees the preview as they progress.
+    // Each canvas is wrapped in a .canvas-wrap whose first child is the
+    // canvas itself; we move the wraps so the canvas labels travel along
+    // even though we hide them via CSS in the strip.
+    var strip = $('mf-preview-strip');
+    if (strip) {
+      var c11  = $('canvas-11');
+      var c916 = $('canvas-916');
+      var w11  = c11  && c11.parentElement;
+      var w916 = c916 && c916.parentElement;
+      if (w11)  strip.appendChild(w11);
+      if (w916) strip.appendChild(w916);
+    }
+  }
+
+  function mfWireGenerateBtn() {
+    var btn = $('mf-generate-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (!allComplete()) return;
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      // Keep the existing pipeline — onExport handles state, progress,
+      // and showResults() at the end. We watch for the results section
+      // becoming visible to slot it into the mobile body.
+      _mfWaitForResults();
+      onExport();
+    });
+  }
+
+  function _mfWaitForResults() {
+    var src = elResultsSection;
+    if (!src) return;
+    // MutationObserver fires when showResults() flips display to 'block'.
+    var obs = new MutationObserver(function () {
+      if (getComputedStyle(src).display !== 'none') {
+        obs.disconnect();
+        mfMountResults();
+      }
+    });
+    obs.observe(src, { attributes: true, attributeFilter: ['style', 'class'] });
+    // Also poll briefly in case the observer misses (e.g. style was already block)
+    setTimeout(function () {
+      if (getComputedStyle(src).display !== 'none') { obs.disconnect(); mfMountResults(); }
+    }, 100);
+  }
+
+  function mfMountResults() {
+    var body = $('mf-results-body');
+    var src  = elResultsSection;
+    if (!body || !src) return;
+    body.innerHTML = '';
+    body.appendChild(src);
+    src.style.display = 'block';
+    var foot = $('mf-step5-foot');
+    if (foot) foot.style.display = 'block';
+    var subtitle = $('mf-result-sub');
+    if (subtitle) subtitle.textContent = 'Tap to share or save';
+  }
+
+  function mfWireUI() {
+    var back = $('mf-back-btn');
+    if (back) back.addEventListener('click', mfBack);
+    [1,2,3,4].forEach(function (n) {
+      var b = $('mf-btn' + n);
+      if (b) b.addEventListener('click', mfNext);
+    });
+    var restart = $('mf-restart-btn');
+    if (restart) restart.addEventListener('click', mfRestart);
+    mfWireGenerateBtn();
+  }
+
+  function initMobileFlow() {
+    if (!MF_VIEWPORT) return;
+    mfRelocateNodes();
+    mfWireUI();
+    mfUpdateTopbar();
+    mfSyncContinueButtons();
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -1391,6 +1625,11 @@
     renderWizard();
     openStep(1);
     scheduleRender();
+
+    // Mobile-only: relocate the wizard grids into per-step slots and
+    // bind the step controller. Runs after the desktop wizard is built
+    // so all event listeners are already attached to the moved nodes.
+    initMobileFlow();
   }
 
   if (document.readyState === 'loading') {
