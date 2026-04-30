@@ -58,6 +58,17 @@ const CANVAS = (function () {
     if (!src) return Promise.resolve(null);
     if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
 
+    // data: URLs are already inline — no fetch needed. encodeURI() would
+    // double-encode `%` in URL-encoded SVG data URLs and break them.
+    if (src.indexOf('data:') === 0) {
+      return new Promise(function (res) {
+        var img = new Image();
+        img.onload  = function () { _imgCache[src] = img; res(img); };
+        img.onerror = function () { res(null); };
+        img.src = src;
+      });
+    }
+
     var isSvg = src.toLowerCase().indexOf('.svg') !== -1;
     var altSrc = swapAssetsPrefix(src);
     var triedAlt = false;

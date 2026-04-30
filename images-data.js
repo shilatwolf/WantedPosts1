@@ -282,75 +282,59 @@ var IMAGES_DATA = {
     },
     {
       "id": "cu-04",
-      "label": "Beer 1:1 1",
-      "file11": "Assets/images/curseforge/Beer 1_1-1.png",
-      "file916": "Assets/images/curseforge/Beer 1_1-1.png",
+      "label": "Hammer",
+      "file11": "Assets/images/curseforge/Hammer 1_1.png",
+      "file916": "Assets/images/curseforge/Hammer 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-04-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-04-9_16.js"
     },
     {
       "id": "cu-05",
-      "label": "Beer 9:16 1",
-      "file11": "Assets/images/curseforge/Beer 9_16-1.png",
-      "file916": "Assets/images/curseforge/Beer 9_16-1.png",
+      "label": "Megaphone",
+      "file11": "Assets/images/curseforge/Megaphone 1_1.png",
+      "file916": "Assets/images/curseforge/Megaphone 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-05-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-05-9_16.js"
     },
     {
       "id": "cu-06",
-      "label": "Hammer",
-      "file11": "Assets/images/curseforge/Hammer 1_1.png",
-      "file916": "Assets/images/curseforge/Hammer 9_16.png",
+      "label": "Modded Anvil",
+      "file11": "Assets/images/curseforge/Modded Anvil 1_1.png",
+      "file916": "Assets/images/curseforge/Modded Anvil 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-06-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-06-9_16.js"
     },
     {
       "id": "cu-07",
-      "label": "Megaphone",
-      "file11": "Assets/images/curseforge/Megaphone 1_1.png",
-      "file916": "Assets/images/curseforge/Megaphone 9_16.png",
+      "label": "Potion",
+      "file11": "Assets/images/curseforge/Potion 1_1.png",
+      "file916": "Assets/images/curseforge/Potion 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-07-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-07-9_16.js"
     },
     {
       "id": "cu-08",
-      "label": "Modded Anvil",
-      "file11": "Assets/images/curseforge/Modded Anvil 1_1.png",
-      "file916": "Assets/images/curseforge/Modded Anvil 9_16.png",
+      "label": "Shield",
+      "file11": "Assets/images/curseforge/Shield 1_1.png",
+      "file916": "Assets/images/curseforge/Shield 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-08-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-08-9_16.js"
     },
     {
       "id": "cu-09",
-      "label": "Potion",
-      "file11": "Assets/images/curseforge/Potion 1_1.png",
-      "file916": "Assets/images/curseforge/Potion 9_16.png",
+      "label": "Torch",
+      "file11": "Assets/images/curseforge/Torch 1_1.png",
+      "file916": "Assets/images/curseforge/Torch 9_16.png",
       "dataScript11": "Assets/data/curseforge/cu-09-1_1.js",
       "dataScript916": "Assets/data/curseforge/cu-09-9_16.js"
     },
     {
       "id": "cu-10",
-      "label": "Shield",
-      "file11": "Assets/images/curseforge/Shield 1_1.png",
-      "file916": "Assets/images/curseforge/Shield 9_16.png",
-      "dataScript11": "Assets/data/curseforge/cu-10-1_1.js",
-      "dataScript916": "Assets/data/curseforge/cu-10-9_16.js"
-    },
-    {
-      "id": "cu-11",
-      "label": "Torch",
-      "file11": "Assets/images/curseforge/Torch 1_1.png",
-      "file916": "Assets/images/curseforge/Torch 9_16.png",
-      "dataScript11": "Assets/data/curseforge/cu-11-1_1.js",
-      "dataScript916": "Assets/data/curseforge/cu-11-9_16.js"
-    },
-    {
-      "id": "cu-12",
       "label": "Tree",
       "file11": "Assets/images/curseforge/Tree 1_1.png",
       "file916": "Assets/images/curseforge/Tree 9_16.png",
-      "dataScript11": "Assets/data/curseforge/cu-12-1_1.js",
-      "dataScript916": "Assets/data/curseforge/cu-12-9_16.js"
+      "dataScript11": "Assets/data/curseforge/cu-10-1_1.js",
+      "dataScript916": "Assets/data/curseforge/cu-10-9_16.js"
     }
   ]
 };
