@@ -278,7 +278,13 @@ body {
 }
 .brand-card:hover { border-color:var(--b2); background:var(--s2); }
 .brand-card.selected { border-color:var(--accent); background:var(--s2); }
-.brand-card img { height:28px; width:auto; display:block; }
+.brand-card img {
+  max-height:28px;
+  max-width:130px;
+  width:auto;
+  height:auto;
+  display:block;
+}
 .brand-card-name {
   font-family:var(--font-brand);
   font-size:var(--fs-300);
