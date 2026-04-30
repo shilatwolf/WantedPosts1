@@ -452,12 +452,12 @@ const CANVAS = (function () {
   /* ── Layout zone calculators ───────────────────────────── */
   function getZones11(lay) {
     var M  = 65,   W  = 1080, H  = 1080;
-    var LW = 238,  LH = 118;   // logo max
-    var TW = 648,  TH = 313;   // title max
-    var CW = 475,  CH = 85;    // cta max — reduced height keeps button snug under title
-    var titBot = H - 237;      // 843  — bottom of title zone
-    var titTop = titBot - TH;  // 530  — top of title zone
-    var ctaTop = titBot;       // 843  — zero gap: CTA zone starts right at title zone bottom
+    var LW = 290,  LH = 140;   // logo max — bigger presence on the square
+    var TW = 940,  TH = 400;   // title max — wider zone lets long headlines render bigger
+    var CW = 720,  CH = 115;   // cta max — accommodates bigger button
+    var titBot = H - 195;      // 885  — bottom of title zone
+    var titTop = titBot - TH;  // 485  — top of title zone
+    var ctaTop = titBot;       // 885  — zero gap: CTA zone starts right at title zone bottom
 
     if (lay === 'center') return {
       logo:  { x: (W - LW) / 2,     y: M,      w: LW, h: LH, al: 'center' },
@@ -558,7 +558,7 @@ const CANVAS = (function () {
     var cz = zones.cta;
 
     // ── Headline ──────────────────────────────────────────
-    var maxStartSz = is916 ? 110 : 96;
+    var maxStartSz = is916 ? 110 : 130;
     var fit    = fitFont(ctx, msg, tz.w, tz.h, maxStartSz, BF);
     var sz     = fit.sz;
     var lines  = fit.lines;
@@ -591,12 +591,12 @@ const CANVAS = (function () {
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
       var ctaText  = cta.toUpperCase();               // always CAPS
-      var ctaFontSz = is916 ? 42 : 36;
+      var ctaFontSz = is916 ? 42 : 52;
       ctx.save();
       ctx.font = '700 ' + ctaFontSz + 'px ' + BF;   // Montserrat, not Lato
       var txtW  = ctx.measureText(ctaText).width;
-      var padH  = is916 ? 36 : 34;
-      var padV  = is916 ? 22 : 20;
+      var padH  = is916 ? 36 : 42;
+      var padV  = is916 ? 22 : 26;
       var btnW  = Math.min(cz.w, txtW + padH * 2);
       var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
@@ -605,7 +605,7 @@ const CANVAS = (function () {
                                      cz.x + (cz.w - btnW) / 2;
 
       // Fixed gap below last text line — same regardless of title length or font size
-      var ctaGap = is916 ? 60 : 44;
+      var ctaGap = is916 ? 60 : 50;
       var by = textBottom + ctaGap;
 
       // Heartbeat pulse — subtle scale (1 → 1.04 → 1) + brightness mix.
@@ -639,8 +639,8 @@ const CANVAS = (function () {
       // width if the combined string is too long, matching the headline.
       if (subLabel && subLabel.trim()) {
         var subMaxW  = cz.w;
-        var subFontSz = is916 ? 22 : 17;
-        var SUB_MIN  = is916 ? 14 : 11;
+        var subFontSz = is916 ? 22 : 24;
+        var SUB_MIN  = is916 ? 14 : 16;
         ctx.save();
         ctx.font = '300 ' + subFontSz + 'px ' + BF;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
