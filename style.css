@@ -1521,48 +1521,232 @@ footer {
   margin-top: var(--sp-200);
 }
 
-@media (min-width: 768px) {
+/* Round 8: Side-by-side PNG/animated cards on desktop */
+.r8-png-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-600);
+}
+.r8-png-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-200);
+}
+
+@media (min-width: 900px) {
+  .r8-png-row {
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--sp-600);
+  }
+  .r8-png-col {
+    flex: 1;
+    min-width: 0;
+  }
+  .r8-png-col .r8-card { height: 100%; }
+  /* 9:16 inside the side-by-side row stacks vertically (preview on top,
+     centered) so both columns visually mirror each other instead of
+     wasting half the column on whitespace. */
+  .r8-png-row .r8-card-story {
+    flex-direction: column;
+    gap: var(--sp-400);
+    align-items: stretch;
+  }
+  .r8-png-row .r8-card-story .r8-preview-story {
+    width: auto;
+    max-width: 280px;
+    aspect-ratio: 9 / 16;
+    margin: 0 auto;
+  }
   .r8-preview-square { max-width: 480px; margin: 0 auto; }
+}
+
+@media (min-width: 768px) and (max-width: 899px) {
   .r8-card-story .r8-preview-story { width: 220px; }
 }
 
-/* Generate-animated button */
+/* Generate-animated card — Round 8.1: louder, with motion to draw the eye */
 .btn-generate-animated {
+  position: relative;
   width: 100%;
-  padding: 16px;
-  background: transparent;
-  border: 1px solid #252525;
+  padding: 22px 24px;
+  background:
+    linear-gradient(135deg,
+      rgba(0,0,0,0.0) 0%,
+      var(--ow-f) 50%,
+      rgba(0,0,0,0.0) 100%),
+    #0a0a0a;
+  border: 1px solid var(--accent);
   border-radius: 0;
   font-family: var(--font-brand);
-  font-size: 12px;
-  font-weight: var(--fw-bold);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #808080;
+  color: var(--t1);
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  text-align: center;
-  transition: border-color .15s, color .15s;
+  gap: 18px;
+  text-align: left;
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  box-shadow: 0 0 0 0 var(--ow-f);
+  animation: bgaBreathe 3s ease-in-out infinite;
 }
 .btn-generate-animated:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px -8px var(--accent);
+  animation-play-state: paused;
 }
 .btn-generate-animated:disabled {
   cursor: default;
   pointer-events: none;
+  opacity: 0.7;
+  animation: none;
 }
-.btn-generate-animated .bga-sub {
-  font-size: 10px;
+
+/* Breathing accent glow — gentle pulse to signal "interactable / noteworthy" */
+@keyframes bgaBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(211,64,55,0); }
+  50%      { box-shadow: 0 0 0 4px var(--ow-f); }
+}
+
+/* Diagonal shimmer that sweeps across — the most eye-catching cue */
+.bga-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255,255,255,0.10) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: bgaShimmer 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes bgaShimmer {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+.btn-generate-animated:disabled .bga-shimmer { animation: none; opacity: 0; }
+
+/* Pulsing motion icon — communicates "animated" without text */
+.bga-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bga-icon-ring,
+.bga-icon-ring-2 {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0.9;
+  animation: bgaPulseRing 2s ease-out infinite;
+}
+.bga-icon-ring-2 { animation-delay: 1s; }
+@keyframes bgaPulseRing {
+  0%   { transform: scale(0.55); opacity: 0.9; }
+  100% { transform: scale(1.4);  opacity: 0; }
+}
+.bga-icon-dot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  z-index: 1;
+}
+.btn-generate-animated:disabled .bga-icon-ring,
+.btn-generate-animated:disabled .bga-icon-ring-2 { animation: none; }
+
+/* Text block */
+.bga-content {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bga-title {
+  font-size: 14px;
+  font-weight: var(--fw-bold);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: #fff;
+}
+.bga-sub {
+  font-family: var(--font-body);
+  font-size: 12px;
   font-weight: var(--fw-reg);
-  letter-spacing: .3px;
-  color: #606060;
+  letter-spacing: .2px;
+  color: var(--t3);
   text-transform: none;
+  line-height: 1.4;
 }
-.btn-generate-animated:hover .bga-sub { color: var(--accent); }
+
+/* Right meta — time + action arrow */
+.bga-meta {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.bga-time {
+  font-size: 10px;
+  font-weight: var(--fw-med);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.bga-arrow {
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  transition: transform .15s ease;
+}
+.btn-generate-animated:hover .bga-arrow { transform: translateX(2px); }
+
+/* Mobile — stack so nothing gets cramped on narrow screens */
+@media (max-width: 600px) {
+  .btn-generate-animated {
+    flex-wrap: wrap;
+    padding: 18px 16px;
+    gap: 12px;
+  }
+  .bga-content { flex-basis: calc(100% - 62px); }
+  .bga-meta {
+    flex-direction: row;
+    flex-basis: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 4px;
+    border-top: 1px solid #1e1e1e;
+    margin-top: 4px;
+  }
+}
+
+/* Generating-progress state — replaces .bga-content via JS */
+.btn-generate-animated.is-generating .bga-icon-dot {
+  animation: bgaWorking 1.2s ease-in-out infinite;
+}
+@keyframes bgaWorking {
+  0%, 100% { transform: scale(0.7); opacity: 0.6; }
+  50%      { transform: scale(1.1); opacity: 1.0; }
+}
+.btn-generate-animated.is-generating .bga-shimmer {
+  animation: bgaShimmer 1.8s linear infinite;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+}
 
 /* ════════════════════════════════════════════════════════
    ROUND 8 — Mobile preview-on-top hosts + carousel

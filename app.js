@@ -913,11 +913,21 @@
     var btn = $('btn-generate-animated');
     if (!btn) return;
     btn.disabled = true;
-    btn.innerHTML = 'Generating… <span class="bga-sub" id="bga-progress">0%</span>';
+    btn.classList.add('is-generating');
+
+    var titleEl = btn.querySelector('.bga-title');
+    var subEl   = btn.querySelector('.bga-sub');
+    var arrowEl = btn.querySelector('.bga-arrow');
+    var timeEl  = btn.querySelector('.bga-time');
+
+    if (titleEl) titleEl.textContent = '✦ Generating animated versions…';
+    if (subEl)   subEl.textContent   = 'Rendering frames — please wait';
+    if (arrowEl) arrowEl.textContent = '0%';
+    if (timeEl)  timeEl.textContent  = '~15s';
 
     EXPORT.generateBlobs(state, function (pct, label) {
-      var sub = $('bga-progress');
-      if (sub) sub.textContent = Math.round(pct) + '% · ' + (label || '');
+      if (arrowEl) arrowEl.textContent = Math.round(pct) + '%';
+      if (subEl && label) subEl.textContent = label;
     })
       .then(function (blobs) {
         _resultBlobs = blobs;
@@ -927,8 +937,11 @@
       .catch(function (err) {
         console.error('[animated]', err);
         btn.disabled = false;
-        btn.innerHTML = '✗ Failed — try again<span class="bga-sub">' +
-          escapeHtml(err && err.message ? err.message : 'Unknown error') + '</span>';
+        btn.classList.remove('is-generating');
+        if (titleEl) titleEl.textContent = '✗ Generation failed — tap to retry';
+        if (subEl)   subEl.textContent   = (err && err.message) ? err.message : 'Unknown error';
+        if (arrowEl) arrowEl.textContent = 'Retry →';
+        if (timeEl)  timeEl.textContent  = '~15s';
       });
   }
 
@@ -991,8 +1004,15 @@
     var bga = $('btn-generate-animated');
     if (bga) {
       bga.disabled = false;
-      bga.innerHTML = '✦ Generate animated versions' +
-        '<span class="bga-sub">GIF + MP4 · takes ~15 seconds</span>';
+      bga.classList.remove('is-generating');
+      var bgaTitle = bga.querySelector('.bga-title');
+      var bgaSub   = bga.querySelector('.bga-sub');
+      var bgaArrow = bga.querySelector('.bga-arrow');
+      var bgaTime  = bga.querySelector('.bga-time');
+      if (bgaTitle) bgaTitle.textContent = '✦ Add motion to stand out';
+      if (bgaSub)   bgaSub.textContent   = 'Animated GIF + MP4 — moving posts catch more attention in feeds';
+      if (bgaArrow) bgaArrow.textContent = 'Generate →';
+      if (bgaTime)  bgaTime.textContent  = '~15s';
     }
 
     renderResultPreviews();
@@ -1104,21 +1124,28 @@
 
     var all = _jobsCache || [];
 
-    // Filter by brand when positions exist for that brand.
-    // Overwolf is the umbrella brand — always show every open role across
-    // the whole group so recruiters can tag any position under it.
+    // Filter by brand. Overwolf is the umbrella brand — always show every
+    // open role across the whole group so recruiters can tag any position
+    // under it. Sub-brands (Tebex, Outplayed, CurseForge, Overwolf Ads)
+    // get strictly filtered: only roles whose title mentions the brand.
+    // No "fall back to all" — that would mislead users into thinking
+    // unrelated positions belong to the chosen brand.
     var positions = all;
     if (state.brand && state.brand !== 'overwolf') {
-      var branded = all.filter(function (p) { return p.brand === state.brand; });
-      if (branded.length) positions = branded;
+      positions = all.filter(function (p) { return p.brand === state.brand; });
     }
 
     if (!positions.length) {
       var msg = document.createElement('p');
       msg.className = 'pos-hint';
-      msg.textContent = (_jobsCache === null)
-        ? 'Loading open positions…'
-        : 'No open positions right now.';
+      if (_jobsCache === null) {
+        msg.textContent = 'Loading open positions…';
+      } else if (state.brand && state.brand !== 'overwolf' && all.length) {
+        var brandName = (BRANDS[state.brand] && BRANDS[state.brand].name) || state.brand;
+        msg.textContent = 'No open ' + brandName + ' positions right now.';
+      } else {
+        msg.textContent = 'No open positions right now.';
+      }
       list.appendChild(msg);
       return;
     }

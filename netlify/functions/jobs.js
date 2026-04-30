@@ -89,8 +89,15 @@ exports.handler = async () => {
 };
 
 function deriveBrand(title) {
-  if (/tebex/i.test(title))     return 'tebex';
-  if (/outplayed/i.test(title)) return 'outplayed';
+  // More specific patterns first — "Overwolf Ads" must match before bare
+  // "Overwolf" (which is the umbrella default).
+  // "Brand Partnerships" is the internal/alternate name for the Overwolf Ads
+  // team, so roles using that phrasing roll up under the same brand.
+  if (/overwolf\s+ads?/i.test(title))   return 'overwolfads';
+  if (/brand\s+partnerships?/i.test(title)) return 'overwolfads';
+  if (/curseforge/i.test(title))        return 'curseforge';
+  if (/tebex/i.test(title))             return 'tebex';
+  if (/outplayed/i.test(title))         return 'outplayed';
   return 'overwolf';
 }
 

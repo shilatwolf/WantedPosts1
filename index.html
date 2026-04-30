@@ -286,31 +286,49 @@
     </header>
 
     <!-- ── Static PNG cards (always present, instant) ─── -->
-    <div class="results-group-label">LinkedIn · Square</div>
-    <article class="results-card r8-card" data-fmt="png11">
-      <div class="r8-preview r8-preview-square" id="r8-preview-png11"></div>
-      <div class="r8-card-body">
-        <div class="results-format-name">1:1 Static PNG</div>
-        <div class="results-format-desc">Best for LinkedIn, Facebook, X</div>
-        <button class="btn-primary r8-save" id="btn-save-png11">↓ Save PNG</button>
+    <div class="r8-png-row">
+      <div class="r8-png-col">
+        <div class="results-group-label">LinkedIn · Square</div>
+        <article class="results-card r8-card" data-fmt="png11">
+          <div class="r8-preview r8-preview-square" id="r8-preview-png11"></div>
+          <div class="r8-card-body">
+            <div class="results-format-name">1:1 Static PNG</div>
+            <div class="results-format-desc">Best for LinkedIn, Facebook, X</div>
+            <button class="btn-primary r8-save" id="btn-save-png11">↓ Save PNG</button>
+          </div>
+        </article>
       </div>
-    </article>
 
-    <div class="results-group-label">Stories · Vertical</div>
-    <article class="results-card r8-card r8-card-story" data-fmt="png916">
-      <div class="r8-preview r8-preview-story" id="r8-preview-png916"></div>
-      <div class="r8-card-body">
-        <div class="results-format-name">9:16 Static PNG</div>
-        <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
-        <button class="btn-primary r8-save" id="btn-save-png916">↓ Save PNG</button>
+      <div class="r8-png-col">
+        <div class="results-group-label">Stories · Vertical</div>
+        <article class="results-card r8-card r8-card-story" data-fmt="png916">
+          <div class="r8-preview r8-preview-story" id="r8-preview-png916"></div>
+          <div class="r8-card-body">
+            <div class="results-format-name">9:16 Static PNG</div>
+            <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
+            <button class="btn-primary r8-save" id="btn-save-png916">↓ Save PNG</button>
+          </div>
+        </article>
       </div>
-    </article>
+    </div>
 
     <!-- ── Generate animated CTA (replaced after generation) ─── -->
     <div id="animated-section">
       <button class="btn-generate-animated" id="btn-generate-animated">
-        ✦ Generate animated versions
-        <span class="bga-sub">GIF + MP4 · takes ~15 seconds</span>
+        <span class="bga-shimmer" aria-hidden="true"></span>
+        <span class="bga-icon" aria-hidden="true">
+          <span class="bga-icon-ring"></span>
+          <span class="bga-icon-ring bga-icon-ring-2"></span>
+          <span class="bga-icon-dot"></span>
+        </span>
+        <span class="bga-content">
+          <span class="bga-title">✦ Add motion to stand out</span>
+          <span class="bga-sub">Animated GIF + MP4 — moving posts catch more attention in feeds</span>
+        </span>
+        <span class="bga-meta" aria-hidden="true">
+          <span class="bga-time">~15s</span>
+          <span class="bga-arrow">Generate →</span>
+        </span>
       </button>
     </div>
 
@@ -318,29 +336,35 @@
     <div id="animated-results" style="display:none">
       <div class="results-group-label">Animated versions</div>
 
-      <article class="results-card r8-card" data-fmt="gif11">
-        <div class="r8-preview r8-preview-square">
-          <img id="r8-gif-img" alt="Square animated preview">
-          <span class="results-motion-badge"><span class="results-motion-dot"></span>GIF</span>
+      <div class="r8-png-row">
+        <div class="r8-png-col">
+          <article class="results-card r8-card" data-fmt="gif11">
+            <div class="r8-preview r8-preview-square">
+              <img id="r8-gif-img" alt="Square animated preview">
+              <span class="results-motion-badge"><span class="results-motion-dot"></span>GIF</span>
+            </div>
+            <div class="r8-card-body">
+              <div class="results-format-name">1:1 Animated GIF</div>
+              <div class="results-format-desc">Best for LinkedIn</div>
+              <button class="btn-primary r8-save" id="btn-save-gif">↓ Save GIF</button>
+            </div>
+          </article>
         </div>
-        <div class="r8-card-body">
-          <div class="results-format-name">1:1 Animated GIF</div>
-          <div class="results-format-desc">Best for LinkedIn</div>
-          <button class="btn-primary r8-save" id="btn-save-gif">↓ Save GIF</button>
-        </div>
-      </article>
 
-      <article class="results-card r8-card r8-card-story" data-fmt="video916">
-        <div class="r8-preview r8-preview-story">
-          <img id="r8-mp4-img" alt="Story animated preview">
-          <span class="results-motion-badge"><span class="results-motion-dot"></span>MP4</span>
+        <div class="r8-png-col">
+          <article class="results-card r8-card r8-card-story" data-fmt="video916">
+            <div class="r8-preview r8-preview-story">
+              <img id="r8-mp4-img" alt="Story animated preview">
+              <span class="results-motion-badge"><span class="results-motion-dot"></span>MP4</span>
+            </div>
+            <div class="r8-card-body">
+              <div class="results-format-name">9:16 Animated MP4</div>
+              <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
+              <button class="btn-primary r8-save" id="btn-save-mp4">↓ Save / Share</button>
+            </div>
+          </article>
         </div>
-        <div class="r8-card-body">
-          <div class="results-format-name">9:16 Animated MP4</div>
-          <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
-          <button class="btn-primary r8-save" id="btn-save-mp4">↓ Save / Share</button>
-        </div>
-      </article>
+      </div>
 
       <button class="btn-s r8-zip" id="btn-results-zip">↓ Download all as ZIP</button>
     </div>
