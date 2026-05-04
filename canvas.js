@@ -523,7 +523,7 @@ const CANVAS = (function () {
   function fitFont(ctx, text, maxW, maxH, startSz, font) {
     var MIN_SZ = 20;
     function allLinesFit(lines, sz) {
-      if (lines.length * sz * 1.25 > maxH) return false;
+      if (lines.length * sz * 1.1 > maxH) return false;
       for (var i = 0; i < lines.length; i++) {
         if (ctx.measureText(lines[i]).width > maxW) return false;
       }
@@ -533,7 +533,7 @@ const CANVAS = (function () {
     for (var maxL = 2; maxL <= 3; maxL++) {
       sz = startSz;
       while (sz >= MIN_SZ) {
-        ctx.font = '800 ' + sz + 'px ' + font;
+        ctx.font = '700 ' + sz + 'px ' + font;
         lines = wrapText(ctx, text, maxW, maxL);
         if (lines.length <= maxL && allLinesFit(lines, sz)) {
           return { sz: sz, lines: lines };
@@ -542,9 +542,30 @@ const CANVAS = (function () {
       }
     }
     // Absolute fallback — 3 lines at minimum size
-    ctx.font = '800 ' + MIN_SZ + 'px ' + font;
+    ctx.font = '700 ' + MIN_SZ + 'px ' + font;
     lines = wrapText(ctx, text, maxW, 3);
     return { sz: MIN_SZ, lines: lines };
+  }
+
+  /* ── Manual letter-spacing renderer ─────────────────────
+     Canvas 2D's letterSpacing property is unevenly supported and
+     skipped entirely in some export pipelines.  Drawing each
+     character with an explicit offset is reliable everywhere. */
+  function drawTextWithSpacing(ctx, text, x, y, letterSpacing, align) {
+    var chars  = text.split('');
+    var widths = chars.map(function (ch) { return ctx.measureText(ch).width; });
+    var totalWidth = widths.reduce(function (a, b) { return a + b; }, 0)
+                   + letterSpacing * Math.max(0, chars.length - 1);
+
+    var startX = x;
+    if (align === 'center') startX = x - totalWidth / 2;
+    else if (align === 'right') startX = x - totalWidth;
+
+    var curX = startX;
+    for (var i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], curX, y);
+      curX += widths[i] + letterSpacing;
+    }
   }
 
   /* ── Text + CTA rendering ──────────────────────────────── */
@@ -562,7 +583,7 @@ const CANVAS = (function () {
     var fit    = fitFont(ctx, msg, tz.w, tz.h, maxStartSz, BF);
     var sz     = fit.sz;
     var lines  = fit.lines;
-    var lineH  = sz * 1.25;
+    var lineH  = sz * 1.1;
     var totalH = lines.length * lineH;
     var startY = tz.y + (tz.h - totalH) / 2 + lineH / 2 + msgYOffset;
 
@@ -572,7 +593,7 @@ const CANVAS = (function () {
 
     ctx.save();
     ctx.globalAlpha   = msgOpacity;
-    ctx.font          = '800 ' + sz + 'px ' + BF;
+    ctx.font          = '700 ' + sz + 'px ' + BF;
     ctx.fillStyle     = '#FFFFFF';
     ctx.textAlign     = tz.al;
     ctx.textBaseline  = 'middle';
@@ -592,9 +613,12 @@ const CANVAS = (function () {
     if (cta && cta.trim()) {
       var ctaText  = cta.toUpperCase();               // always CAPS
       var ctaFontSz = is916 ? 42 : 52;
+      var ctaLetterSp = ctaFontSz * 0.005;            // 0.5% of font size
       ctx.save();
-      ctx.font = '700 ' + ctaFontSz + 'px ' + BF;   // Montserrat, not Lato
-      var txtW  = ctx.measureText(ctaText).width;
+      ctx.font = '500 ' + ctaFontSz + 'px ' + BF;   // Montserrat Medium
+      // Width must include letter-spacing — otherwise the button
+      // sizes to the un-spaced text and clips the trailing chars.
+      var txtW  = ctx.measureText(ctaText).width + ctaLetterSp * Math.max(0, ctaText.length - 1);
       var padH  = is916 ? 36 : 42;
       var padV  = is916 ? 22 : 26;
       var btnW  = Math.min(cz.w, txtW + padH * 2);
@@ -624,14 +648,13 @@ const CANVAS = (function () {
       ctx.fillStyle = 'rgb(' + pr + ',' + pg + ',' + pb + ')';
       ctx.fillRect(-btnW / 2, -btnH / 2, btnW, btnH);
 
-      // Button text — Montserrat Bold CAPS
+      // Button text — Montserrat Medium CAPS, 0.5% letter spacing
       ctx.fillStyle    = brand.ctaTextColor;
-      ctx.font         = '700 ' + ctaFontSz + 'px ' + BF;
-      ctx.textAlign    = 'center';
+      ctx.font         = '500 ' + ctaFontSz + 'px ' + BF;
       ctx.textBaseline = 'middle';
       ctx.shadowColor  = 'rgba(0,0,0,0)';
       ctx.shadowBlur   = 0;
-      ctx.fillText(ctaText, 0, 0);
+      drawTextWithSpacing(ctx, ctaText, 0, 0, ctaLetterSp, 'center');
       ctx.restore();
 
       // ── Sub-label below button (optional) ─────────────
@@ -639,24 +662,29 @@ const CANVAS = (function () {
       // width if the combined string is too long, matching the headline.
       if (subLabel && subLabel.trim()) {
         var subMaxW  = cz.w;
-        var subFontSz = is916 ? 22 : 24;
-        var SUB_MIN  = is916 ? 14 : 16;
-        ctx.save();
-        ctx.font = '300 ' + subFontSz + 'px ' + BF;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.10em';
-        while (subFontSz > SUB_MIN && ctx.measureText(subLabel.toUpperCase()).width > subMaxW) {
-          subFontSz -= 1;
-          ctx.font = '300 ' + subFontSz + 'px ' + BF;
+        var subFontSz = is916 ? 30 : 24;
+        var SUB_MIN  = is916 ? 18 : 16;
+        var subText  = subLabel.toUpperCase();
+        function subSpacing() { return subFontSz * 0.08; }
+        function subWidth() {
+          var w = ctx.measureText(subText).width;
+          return w + subSpacing() * Math.max(0, subText.length - 1);
         }
-        ctx.fillStyle    = 'rgba(255,255,255,0.65)';
-        ctx.textAlign    = cz.al === 'center' ? 'center' : 'left';
+        ctx.save();
+        ctx.font = '500 ' + subFontSz + 'px ' + BF;
+        while (subFontSz > SUB_MIN && subWidth() > subMaxW) {
+          subFontSz -= 1;
+          ctx.font = '500 ' + subFontSz + 'px ' + BF;
+        }
+        ctx.fillStyle    = 'rgba(255,255,255,0.7)';
         ctx.textBaseline = 'top';
         ctx.shadowColor  = 'rgba(0,0,0,0.9)';
         ctx.shadowBlur   = 6;
+        var subAlign = cz.al === 'center' ? 'center' : 'left';
         var subX = cz.al === 'center' ? (cz.x + cz.w / 2) : cz.x;
         var subGap = Math.round(btnH * 0.45);
         var subY = by + btnH + subGap;
-        ctx.fillText(subLabel.toUpperCase(), subX, subY);
+        drawTextWithSpacing(ctx, subText, subX, subY, subSpacing(), subAlign);
         ctx.restore();
       }
     }

@@ -73,5 +73,6 @@ const CTA_OPTIONS = [
   'Join Our Pack',
   "We're Hiring",
   'Hunt With Us',
-  'Be The Alpha'
+  'Run With The Pack',
+  'Join The Hunt'
 ];

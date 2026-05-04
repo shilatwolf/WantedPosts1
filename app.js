@@ -6,19 +6,29 @@
 
 (function () {
 
+  /* ── Placeholder defaults (Round 10) ───────────────────────
+     The canvas should never look empty on load. We inject these
+     at render time only — state stays "real" so isComplete()
+     and chip-selected styling continue to require explicit
+     user choices. The brand is the one exception: 'overwolf'
+     is a meaningful real default, pre-selected in Step 1.       */
+  var DEFAULT_BRAND       = 'overwolf';
+  var PLACEHOLDER_PRESET  = 'Wolves Wanted';
+  var PLACEHOLDER_CTA     = 'Apply Now';
+
   /* ── State ──────────────────────────────────────────────── */
   var state = {
-    brand:           null,   // 'overwolf' | 'tebex' | 'outplayed'
-    image:           null,   // image object from manifest
-    layout:          'left', // always left — layout step removed
+    brand:           DEFAULT_BRAND,   // pre-selected on load; user can change
+    image:           null,            // image object from manifest
+    layout:          'left',          // always left — layout step removed
     messageMode:     'position',
     messagePreset:   null,
     messagePosition: '',
-    positionRef:     null,   // full position object when a chip is selected
-    referralLink:    '',     // user-pasted https://careers.overwolf.com/career/…?ref=…
+    positionRef:     null,            // full position object when a chip is selected
+    referralLink:    '',              // user-pasted https://careers.overwolf.com/career/…?ref=…
     cta:             null,
-    subLabel:        [],     // optional notes below CTA button (multi-select)
-    smartSuggestions:[],     // subset of subLabel that was auto-suggested for the current position
+    subLabel:        [],              // optional notes below CTA button (multi-select)
+    smartSuggestions:[],              // subset of subLabel that was auto-suggested for the current position
     // internal
     images:          {}
   };
@@ -222,13 +232,48 @@
     }
   }
 
+  /* ── Placeholder render-state (Round 10) ────────────────
+     Build a derived state where any field the user hasn't yet
+     chosen falls back to a placeholder (default image, preset,
+     or CTA). The real `state` is left untouched so isComplete()
+     and the wizard UI continue to reflect actual selections.   */
+  function getDefaultImage(brandKey) {
+    var b = brandKey || state.brand;
+    if (!b || !BRANDS[b]) return null;
+    var poolKey = BRANDS[b].imagePool;
+    var src  = (state.images && state.images[poolKey] && state.images[poolKey].length)
+               ? state.images
+               : (typeof IMAGES_DATA !== 'undefined' ? IMAGES_DATA : {});
+    var pool = src[poolKey] || [];
+    return pool[0] || null;
+  }
+
+  function getRenderState() {
+    var headlineMissing = state.messageMode === 'preset'
+      ? !state.messagePreset
+      : !(state.messagePosition && state.messagePosition.trim());
+    if (state.image && !headlineMissing && state.cta) return state;
+
+    var rs = Object.assign({}, state);
+    if (!rs.image) {
+      var def = getDefaultImage(rs.brand);
+      if (def) rs.image = def;
+    }
+    if (headlineMissing) {
+      rs.messageMode   = 'preset';
+      rs.messagePreset = PLACEHOLDER_PRESET;
+    }
+    if (!rs.cta) rs.cta = PLACEHOLDER_CTA;
+    return rs;
+  }
+
   /* ── Trigger preview re-render ────────────────────────── */
   var _renderTimer = null;
   function scheduleRender() {
     clearTimeout(_renderTimer);
     _renderTimer = setTimeout(function () {
       document.fonts.ready.then(function () {
-        CANVAS.render(state).catch(function (e) { console.warn('[CANVAS]', e); });
+        CANVAS.render(getRenderState()).catch(function (e) { console.warn('[CANVAS]', e); });
       });
     }, 60);
   }
@@ -639,7 +684,10 @@
 
   /* ── Start over ──────────────────────────────────────── */
   function onRestart() {
-    state.brand           = null;
+    // Round 10: restart returns to the placeholder-default state —
+    // brand pre-selected, canvas showing 'Wolves Wanted' / 'Apply Now'
+    // over the first available visual — rather than a totally empty wizard.
+    state.brand           = DEFAULT_BRAND;
     state.image           = null;
     state.layout          = 'left';
     state.messageMode     = 'position';
@@ -652,7 +700,7 @@
     state.smartSuggestions = [];
     syncStickyPosBar();
     CANVAS.resetSeeds();
-    setAccent(null);
+    setAccent(state.brand);
 
     syncBrandGrid();
     buildImageGrid();
@@ -1136,17 +1184,33 @@
     }
 
     if (!positions.length) {
-      var msg = document.createElement('p');
-      msg.className = 'pos-hint';
       if (_jobsCache === null) {
-        msg.textContent = 'Loading open positions…';
-      } else if (state.brand && state.brand !== 'overwolf' && all.length) {
-        var brandName = (BRANDS[state.brand] && BRANDS[state.brand].name) || state.brand;
-        msg.textContent = 'No open ' + brandName + ' positions right now.';
-      } else {
-        msg.textContent = 'No open positions right now.';
+        var loading = document.createElement('p');
+        loading.className = 'pos-hint';
+        loading.textContent = 'Loading open positions…';
+        list.appendChild(loading);
+        return;
       }
-      list.appendChild(msg);
+      // Sub-brand had no roles but the umbrella has openings — invite the
+      // user to switch brands rather than leaving them stuck.
+      if (state.brand && state.brand !== 'overwolf' && all.length) {
+        var brandName = (BRANDS[state.brand] && BRANDS[state.brand].name) || state.brand;
+        var fallback = document.createElement('div');
+        fallback.className = 'pos-empty-fallback';
+        fallback.innerHTML =
+          '<p class="pos-empty-fallback-msg">No open ' + escapeHtml(brandName) +
+          ' positions right now.</p>' +
+          '<button type="button" class="pos-empty-fallback-btn" id="pos-fallback-btn">' +
+          'Browse Overwolf positions instead →</button>';
+        list.appendChild(fallback);
+        var btn = $('pos-fallback-btn');
+        if (btn) btn.addEventListener('click', function () { onBrandSelect('overwolf'); });
+        return;
+      }
+      var none = document.createElement('p');
+      none.className = 'pos-hint';
+      none.textContent = 'No open positions right now.';
+      list.appendChild(none);
       return;
     }
 
@@ -1445,12 +1509,44 @@
     if (restart) restart.addEventListener('click', mfRestart);
   }
 
+  // Round 8.1: swipe-to-select on the visual carousel.
+  // After the user scrolls the horizontal thumbnail strip and the scroll
+  // settles, select whichever thumb is aligned with the strip's left edge.
+  // This makes the carousel feel like a phone photo roll — swipe to browse,
+  // and the preview at the top updates live as the leading thumb changes.
+  function wireImageCarouselSwipe() {
+    if (!MF_VIEWPORT) return;
+    var strip = $('image-grid');
+    if (!strip) return;
+    var endTimer = null;
+    strip.addEventListener('scroll', function () {
+      clearTimeout(endTimer);
+      endTimer = setTimeout(function () {
+        var thumbs = strip.querySelectorAll('.image-thumb');
+        if (!thumbs.length) return;
+        var stripRect = strip.getBoundingClientRect();
+        // Center of the strip's leftmost visible region (small offset for snap)
+        var anchorX = stripRect.left + 12;
+        var best = null, bestDist = Infinity;
+        for (var i = 0; i < thumbs.length; i++) {
+          var r = thumbs[i].getBoundingClientRect();
+          // Skip items that are off-screen entirely
+          if (r.right < stripRect.left || r.left > stripRect.right) continue;
+          var d = Math.abs(r.left - anchorX);
+          if (d < bestDist) { bestDist = d; best = thumbs[i]; }
+        }
+        if (best && !best.classList.contains('selected')) best.click();
+      }, 120);
+    }, { passive: true });
+  }
+
   function initMobileFlow() {
     if (!MF_VIEWPORT) return;
     mfRelocateNodes();
     mfWireUI();
     mfUpdateTopbar();
     mfSyncContinueButtons();
+    wireImageCarouselSwipe();
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -1471,6 +1567,17 @@
     buildPresetGrid();
     buildCTAGrid();
     buildSubLabelChips();
+
+    // Round 10: default brand is pre-selected on load. Wire up its
+    // UI side-effects (accent color, brand-card highlight, image grid,
+    // position chips) so the user lands on a fully-set-up Step 1.
+    if (state.brand) {
+      setAccent(state.brand);
+      syncBrandGrid();
+      buildImageGrid();
+      buildPositionChips();
+    }
+
     fetchJobs();
 
     // Sub-label other input
@@ -1498,8 +1605,15 @@
     syncCtaRequired();
 
     renderWizard();
-    openStep(1);
-    scheduleRender();
+    // Round 10: brand is pre-selected, so Step 1 is already ✓.
+    // Open the first incomplete step (typically Step 2 — image).
+    advance();
+
+    // Round 10: prewarm the brand logo + default image before the first
+    // render so the canvas appears fully composed, not logo-less.
+    CANVAS.prewarmExportImages(getRenderState())
+      .then(function () { scheduleRender(); })
+      .catch(function () { scheduleRender(); });
 
     // Mobile-only: relocate the wizard grids into per-step slots and
     // bind the step controller. Runs after the desktop wizard is built

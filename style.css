@@ -1222,16 +1222,24 @@ footer {
   /* Slot 3 + 4 inherit existing styles since the grids/chips already
      handle small screens via their own media queries. */
 
-  /* ── Round 8: Step 2 mobile — preview + horizontal carousel ── */
+  /* ── Round 8.1: Step 2 mobile — preview + horizontal carousel ──
+     Preview is capped so the carousel + footer button always fit on screen
+     without scrolling. We use dvh (dynamic viewport) so the cap respects
+     the address bar / bottom chrome on iOS Safari + Android Chrome. */
   #mf-preview-host-2 {
-    aspect-ratio: 1 / 1;
     width: 100%;
-    max-height: 50vh;
+    /* Center the square preview when host is wider than tall */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Scale to whichever is smaller — viewport width or 42% of usable height */
+    height: min(100vw, 42dvh);
+    flex-shrink: 0;
   }
   #mf-preview-host-2 canvas {
-    width: 100% !important;
+    width: auto !important;
     height: 100% !important;
-    object-fit: contain;
+    aspect-ratio: 1 / 1;
     display: block;
     border: none !important;
     border-radius: 0 !important;
@@ -1264,16 +1272,20 @@ footer {
     padding: 3px 4px;
   }
 
-  /* ── Round 8: Step 4 mobile — preview + chips ── */
+  /* ── Round 8.1: Step 4 mobile — preview + chips. Preview is capped so
+     the CTA chips, sublabel chips, and footer button stay visible. */
   #mf-preview-host-4 {
-    aspect-ratio: 1 / 1;
     width: 100%;
-    max-height: 45vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: min(100vw, 38dvh);
+    flex-shrink: 0;
   }
   #mf-preview-host-4 canvas {
-    width: 100% !important;
+    width: auto !important;
     height: 100% !important;
-    object-fit: contain;
+    aspect-ratio: 1 / 1;
     display: block;
     border: none !important;
     border-radius: 0 !important;
@@ -1385,6 +1397,41 @@ footer {
   margin-top: 4px;
 }
 .pos-acc-detail-link:hover { text-decoration: underline; }
+
+/* Empty-state fallback when the picked sub-brand has no open roles */
+.pos-empty-fallback {
+  padding: var(--sp-600);
+  background: var(--s1);
+  border: 1px dashed var(--b4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-300);
+  text-align: center;
+}
+.pos-empty-fallback-msg {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--t2);
+  margin: 0;
+}
+.pos-empty-fallback-btn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 10px 18px;
+  font-family: var(--font-brand);
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-up);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.pos-empty-fallback-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
 
 /* Sticky position bar */
 .sticky-position-bar {
