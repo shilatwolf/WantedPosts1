@@ -280,10 +280,15 @@ body {
 .brand-card:hover { border-color:var(--b2); background:var(--s2); }
 .brand-card.selected { border-color:var(--accent); background:var(--s2); }
 .brand-card img {
-  max-height:28px;
-  max-width:130px;
+  /* Round 14: tighter bounding box so CurseForge (300:50 wordmark)
+     stops dominating Tebex (150:80) horizontally. Both caps are
+     active; aspect ratio is preserved by the browser via
+     width/height auto + object-fit contain. */
+  max-width:100px;
+  max-height:22px;
   width:auto;
   height:auto;
+  object-fit:contain;
   display:block;
 }
 .brand-card-name {
