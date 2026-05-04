@@ -137,9 +137,12 @@
   var elBtnExport  = $('btn-export');
   /* ── Accent CSS variables ─────────────────────────────── */
   function setAccent(brand) {
-    var b = brand ? BRANDS[brand] : { accent: '#D34037', accentHover: '#F05C48' };
+    var b = brand ? BRANDS[brand] : { accent: '#D34037', accentHover: '#F05C48', ctaTextColor: '#FFFFFF' };
     document.documentElement.style.setProperty('--accent',       b.accent);
     document.documentElement.style.setProperty('--accent-hover', b.accentHover);
+    // Round 13: text drawn on top of --accent must respect the
+    // brand's ctaTextColor (e.g. Tebex cyan needs black text).
+    document.documentElement.style.setProperty('--accent-fg', b.ctaTextColor || '#FFFFFF');
     var hex = b.accent;
     var r = parseInt(hex.slice(1, 3), 16);
     var g = parseInt(hex.slice(3, 5), 16);
