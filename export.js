@@ -26,14 +26,13 @@ const EXPORT = (function () {
   }
 
   /* ── GIF frame state ─────────────────────────────────── */
-  // 45 frames @ 15 fps = 3 s loop, seamlessly modulo-wrapped.
-  // Headline stays fully opaque in every recorded frame — the fade-in
-  // was previously baked into the loop which caused the headline to
-  // flash-out once per iteration. The loop now only contains the
-  // settled, steady state (smoke drift + CTA pulse).
+  // Round 11: 54 frames @ 18 fps = 3 s loop (was 45 @ 15 fps).
+  // 20% faster framerate keeps total duration identical while
+  // making motion feel snappier — particle speeds were also
+  // multiplied by 1.2× in canvas.genSeeds.
   function gifFrameState(f) {
     var LOOP = 3.0;
-    var t = f / 15;
+    var t = f / 18;
     return {
       msgOpacity:  1,
       msgYOffset:  0,
@@ -94,9 +93,9 @@ const EXPORT = (function () {
   /* ── GIF: 45-frame animated 1:1 ─────────────────────── */
   function makeGIF(state, onProgress) {
     return new Promise(function (resolve, reject) {
-      var FRAMES = 45;
-      var FPS    = 15;
-      var DELAY  = Math.round(1000 / FPS); // 67 ms
+      var FRAMES = 54;
+      var FPS    = 18;
+      var DELAY  = Math.round(1000 / FPS); // 56 ms
 
       if (typeof GIF === 'undefined') {
         reject(new Error('gif.js not loaded'));
@@ -394,7 +393,7 @@ const EXPORT = (function () {
     return makePNG(state, false)
       .then(function (blob) {
         png11 = blob;
-        step(5, 'Generating 1:1 GIF (45 frames)…');
+        step(5, 'Generating 1:1 GIF (54 frames)…');
         return makeGIF(state, function (f) {
           step(5 + f * 50, 'Generating GIF… ' + Math.round(f * 100) + '%');
         });
@@ -460,7 +459,7 @@ const EXPORT = (function () {
     makePNG(state, false)
       .then(function (blob) {
         png11 = blob;
-        step(5, 'Generating 1:1 GIF (45 frames)…');
+        step(5, 'Generating 1:1 GIF (54 frames)…');
         return makeGIF(state, function (f) {
           step(5 + f * 50, 'Generating GIF… ' + Math.round(f * 100) + '%');
         });

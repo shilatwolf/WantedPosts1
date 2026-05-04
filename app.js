@@ -6,30 +6,30 @@
 
 (function () {
 
-  /* ── Placeholder defaults (Round 10) ───────────────────────
-     The canvas should never look empty on load. We inject these
-     at render time only — state stays "real" so isComplete()
-     and chip-selected styling continue to require explicit
-     user choices. The brand is the one exception: 'overwolf'
-     is a meaningful real default, pre-selected in Step 1.       */
+  /* ── Defaults (Round 11) ───────────────────────────────────
+     Round 11 promotes the placeholder defaults from render-time
+     fallbacks into real state values. brand / messagePreset /
+     cta all have meaningful defaults so Save works the moment
+     the manifest finishes loading (state.image is set then).
+     The wizard still starts on Step 1 — defaults don't advance.   */
   var DEFAULT_BRAND       = 'overwolf';
   var PLACEHOLDER_PRESET  = 'Wolves Wanted';
   var PLACEHOLDER_CTA     = 'Apply Now';
 
   /* ── State ──────────────────────────────────────────────── */
   var state = {
-    brand:           DEFAULT_BRAND,   // pre-selected on load; user can change
-    image:           null,            // image object from manifest
-    layout:          'left',          // always left — layout step removed
-    messageMode:     'position',
-    messagePreset:   null,
+    brand:           DEFAULT_BRAND,        // pre-selected on load; user can change
+    image:           null,                 // set after manifest loads (init())
+    layout:          'left',               // always left — layout step removed
+    messageMode:     'preset',
+    messagePreset:   PLACEHOLDER_PRESET,
     messagePosition: '',
-    positionRef:     null,            // full position object when a chip is selected
-    referralLink:    '',              // user-pasted https://careers.overwolf.com/career/…?ref=…
-    cta:             null,
-    subLabel:        [],              // optional notes below CTA button (multi-select)
-    smartSuggestions:[],              // subset of subLabel that was auto-suggested for the current position
-    // internal
+    positionRef:     null,
+    referralLink:    '',
+    cta:             PLACEHOLDER_CTA,
+    subLabel:        [],
+    smartSuggestions:[],
+    _usingDefaults:  true,                 // flips false after any explicit user choice
     images:          {}
   };
 
@@ -152,6 +152,19 @@
     return isComplete(1) && isComplete(2) && isComplete(3) && isComplete(4);
   }
 
+  /* ── Export availability (Round 11) ───────────────────────
+     Save/export is enabled whenever the four required fields
+     are set — regardless of whether they came from explicit
+     user choices or from the on-load defaults.                 */
+  function canExport() {
+    return !!(
+      state.brand &&
+      state.image &&
+      (state.messagePosition || state.messagePreset) &&
+      state.cta
+    );
+  }
+
   /* ── Update step indicator ────────────────────────────── */
   function updateIndicator() {
     elSiItems.forEach(function (el, i) {
@@ -202,7 +215,7 @@
       if (sumEl) sumEl.textContent = stepSummary(n);
     }
     updateIndicator();
-    elBtnExport.disabled = !allComplete();
+    elBtnExport.disabled = !canExport();
   }
 
   /* ── Open / collapse a step ───────────────────────────── */
@@ -684,29 +697,51 @@
 
   /* ── Start over ──────────────────────────────────────── */
   function onRestart() {
-    // Round 10: restart returns to the placeholder-default state —
-    // brand pre-selected, canvas showing 'Wolves Wanted' / 'Apply Now'
-    // over the first available visual — rather than a totally empty wizard.
+    // Round 11: restart returns to the same defaults init() applies —
+    // brand + preset + cta pre-selected, first available visual chosen,
+    // wizard re-opens at Step 1.
     state.brand           = DEFAULT_BRAND;
     state.image           = null;
     state.layout          = 'left';
-    state.messageMode     = 'position';
-    state.messagePreset   = null;
+    state.messageMode     = 'preset';
+    state.messagePreset   = PLACEHOLDER_PRESET;
     state.messagePosition = '';
     state.positionRef     = null;
     state.referralLink    = '';
-    state.cta             = null;
+    state.cta             = PLACEHOLDER_CTA;
     state.subLabel        = [];
     state.smartSuggestions = [];
+    state._usingDefaults  = true;
     syncStickyPosBar();
     CANVAS.resetSeeds();
     setAccent(state.brand);
 
     syncBrandGrid();
     buildImageGrid();
-    clearPreset();
+    // Re-seed the default visual after the grid is rebuilt
+    var restartImg = getDefaultImage(state.brand);
+    if (restartImg) {
+      state.image = restartImg;
+      syncImageGrid();
+    }
+    // Don't clearPreset()/clearCTA() — that wipes our defaults. Just
+    // re-apply the visual selection on the chips.
+    if (elPresetGrid) {
+      elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.value === state.messagePreset);
+      });
+    }
+    var posList = $('pos-acc-list');
+    if (posList) posList.querySelectorAll('.pos-acc-row').forEach(function (el) {
+      el.classList.remove('selected');
+    });
     buildPositionChips();
-    clearCTA();
+    if (elCtaGrid) {
+      elCtaGrid.querySelectorAll('.cta-chip').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.value === state.cta);
+      });
+    }
+    syncCtaRequired();
     clearSubLabel();
 
     // Close general-copy disclosure
@@ -1136,12 +1171,13 @@
   ══════════════════════════════════════════════════════════ */
   function syncCtaRequired() {
     var hasCta = !!state.cta;
-    [['cta-required-note',    'btn-export'],
-     ['mf-cta-required-note', 'mf-btn4']].forEach(function (pair) {
+    var exportable = canExport();
+    [['cta-required-note',    'btn-export', exportable],
+     ['mf-cta-required-note', 'mf-btn4',    hasCta]].forEach(function (pair) {
       var note = $(pair[0]);
       var btn  = $(pair[1]);
       if (note) note.classList.toggle('hidden', hasCta);
-      if (btn)  btn.disabled = !hasCta;
+      if (btn)  btn.disabled = !pair[2];
     });
   }
 
@@ -1568,14 +1604,37 @@
     buildCTAGrid();
     buildSubLabelChips();
 
-    // Round 10: default brand is pre-selected on load. Wire up its
-    // UI side-effects (accent color, brand-card highlight, image grid,
-    // position chips) so the user lands on a fully-set-up Step 1.
+    // Round 11: brand / preset / cta come from defaults. Wire up
+    // accent + grid highlights so the user lands on Step 1 with a
+    // pre-selected brand, preset chip, and CTA chip — and a real
+    // banner already rendered behind the wizard.
     if (state.brand) {
       setAccent(state.brand);
       syncBrandGrid();
       buildImageGrid();
       buildPositionChips();
+
+      // Manifest just parsed — promote the first available visual
+      // into state so canExport() succeeds out of the box.
+      if (!state.image) {
+        var defImg = getDefaultImage(state.brand);
+        if (defImg) {
+          state.image = defImg;
+          syncImageGrid();
+        }
+      }
+
+      // Visually pre-select the default preset + CTA chips.
+      if (state.messagePreset && elPresetGrid) {
+        elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+          el.classList.toggle('selected', el.dataset.value === state.messagePreset);
+        });
+      }
+      if (state.cta && elCtaGrid) {
+        elCtaGrid.querySelectorAll('.cta-chip').forEach(function (el) {
+          el.classList.toggle('selected', el.dataset.value === state.cta);
+        });
+      }
     }
 
     fetchJobs();
@@ -1605,9 +1664,10 @@
     syncCtaRequired();
 
     renderWizard();
-    // Round 10: brand is pre-selected, so Step 1 is already ✓.
-    // Open the first incomplete step (typically Step 2 — image).
-    advance();
+    // Round 11: ALWAYS land on Step 1, even though defaults make
+    // every step technically "complete". User can confirm the
+    // pre-selected brand or change it before moving on.
+    openStep(1);
 
     // Round 10: prewarm the brand logo + default image before the first
     // render so the canvas appears fully composed, not logo-less.
