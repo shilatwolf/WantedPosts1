@@ -280,11 +280,11 @@ body {
 .brand-card:hover { border-color:var(--b2); background:var(--s2); }
 .brand-card.selected { border-color:var(--accent); background:var(--s2); }
 .brand-card img {
-  /* Round 14 (revised): tighter caps so CurseForge (3.56:1)
-     can't dwarf Tebex (1.98:1). Both caps active simultaneously;
-     each logo renders at whichever limit it hits first. */
-  max-width:60px;
-  max-height:20px;
+  /* Round 14 (final): 87×28 cap. Width cap trims CurseForge to
+     match Overwolf's footprint without shrinking the others;
+     Tebex stays under both caps and renders at full 28px height. */
+  max-width:87px;
+  max-height:28px;
   width:auto;
   height:auto;
   object-fit:contain;
@@ -292,8 +292,8 @@ body {
 }
 @media (max-width: 768px) {
   .brand-card img {
-    max-width:54px;
-    max-height:18px;
+    max-width:74px;
+    max-height:24px;
   }
 }
 .brand-card-name {
