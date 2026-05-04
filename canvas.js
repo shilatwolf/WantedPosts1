@@ -478,7 +478,7 @@ const CANVAS = (function () {
     var M  = 65,   W  = 1080;
     var LW = 238,  LH = 72;
     var TW = 907,  TH = 350;
-    var CW = 648,  CH = 99;
+    var CW = 648,  CH = 115;          // Round 12: CH 99 → 115 to fit the 110px button (position unchanged)
     var SAFE = 270;
 
     if (lay === 'center') return {
@@ -614,17 +614,18 @@ const CANVAS = (function () {
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
       var ctaText  = cta.toUpperCase();               // always CAPS
-      // Round 11: CTA font sizes 30 (1:1) / 40 (9:16); button rect
-      // heights 76 / 96 — derived as font + padV*2.
-      var ctaFontSz = is916 ? 40 : 30;
+      // Round 12: whole CTA unit × 1.15 over Round 11 baseline.
+      // Font 30→35 (1:1), 40→46 (9:16); padH 32→37 / 40→46;
+      // padV tuned so btnH = 76→87 (1:1), 96→110 (9:16).
+      var ctaFontSz = is916 ? 46 : 35;
       var ctaLetterSp = ctaFontSz * 0.005;            // 0.5% of font size
       ctx.save();
       ctx.font = '500 ' + ctaFontSz + 'px ' + BF;   // Montserrat Medium
       // Width must include letter-spacing — otherwise the button
       // sizes to the un-spaced text and clips the trailing chars.
       var txtW  = ctx.measureText(ctaText).width + ctaLetterSp * Math.max(0, ctaText.length - 1);
-      var padH  = is916 ? 36 : 42;
-      var padV  = is916 ? 28 : 23;                    // → btnH 96 / 76
+      var padH  = is916 ? 46 : 37;
+      var padV  = is916 ? 32 : 26;                    // → btnH 110 / 87
       var btnW  = Math.min(cz.w, txtW + padH * 2);
       var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 
