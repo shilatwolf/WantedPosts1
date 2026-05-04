@@ -9,14 +9,16 @@
 const EXPORT = (function () {
 
   /* ── CTA heartbeat helper ─────────────────────────────
-     One pulse per 3-sec interval, 0.8 s window, sine ease-in-out.
-     Returns a 0..1 intensity consumed by canvas.drawText.
-     GIF (3 s loop) → one pulse per loop.
-     MP4 (10 s loop) → pulses at 3 s, 6 s, 9 s.                     */
+     Round 11: pulse interval 2.24 s, duration 0.64 s (20% faster).
+     GIF (2.4 s loop) → one pulse per loop.
+     MP4 (10 s loop) → pulses every 2.24 s.                       */
+  var CTA_PULSE_INTERVAL = 2.24;
+  var CTA_PULSE_DURATION = 0.64;
+
   function ctaHeartbeat(t, loopDuration) {
-    var pulseDuration = 0.8;
-    var pulseStart = loopDuration >= 8 ? 3.0 : (loopDuration * 0.6);
-    var pulseInterval = loopDuration >= 8 ? 3.0 : loopDuration;
+    var pulseDuration = CTA_PULSE_DURATION;
+    var pulseStart = loopDuration >= 8 ? CTA_PULSE_INTERVAL : (loopDuration * 0.6);
+    var pulseInterval = loopDuration >= 8 ? CTA_PULSE_INTERVAL : loopDuration;
     var n = Math.floor((t - pulseStart) / pulseInterval);
     if (n < 0) return 0;
     var pulseAt = pulseStart + n * pulseInterval;
@@ -26,13 +28,12 @@ const EXPORT = (function () {
   }
 
   /* ── GIF frame state ─────────────────────────────────── */
-  // Round 11: 54 frames @ 18 fps = 3 s loop (was 45 @ 15 fps).
-  // 20% faster framerate keeps total duration identical while
-  // making motion feel snappier — particle speeds were also
-  // multiplied by 1.2× in canvas.genSeeds.
+  // Round 11: 36 frames @ 15 fps = 2.4 s loop (was 45 @ 15 fps).
+  // 20% shorter loop with the same fps — particle speeds were
+  // multiplied by 1.25 in canvas.genSeeds to match.
   function gifFrameState(f) {
-    var LOOP = 3.0;
-    var t = f / 18;
+    var LOOP = 2.4;
+    var t = f / 15;
     return {
       msgOpacity:  1,
       msgYOffset:  0,
@@ -93,9 +94,9 @@ const EXPORT = (function () {
   /* ── GIF: 45-frame animated 1:1 ─────────────────────── */
   function makeGIF(state, onProgress) {
     return new Promise(function (resolve, reject) {
-      var FRAMES = 54;
-      var FPS    = 18;
-      var DELAY  = Math.round(1000 / FPS); // 56 ms
+      var FRAMES = 36;
+      var FPS    = 15;
+      var DELAY  = Math.round(1000 / FPS); // 67 ms
 
       if (typeof GIF === 'undefined') {
         reject(new Error('gif.js not loaded'));
@@ -393,7 +394,7 @@ const EXPORT = (function () {
     return makePNG(state, false)
       .then(function (blob) {
         png11 = blob;
-        step(5, 'Generating 1:1 GIF (54 frames)…');
+        step(5, 'Generating 1:1 GIF (36 frames)…');
         return makeGIF(state, function (f) {
           step(5 + f * 50, 'Generating GIF… ' + Math.round(f * 100) + '%');
         });
@@ -459,7 +460,7 @@ const EXPORT = (function () {
     makePNG(state, false)
       .then(function (blob) {
         png11 = blob;
-        step(5, 'Generating 1:1 GIF (54 frames)…');
+        step(5, 'Generating 1:1 GIF (36 frames)…');
         return makeGIF(state, function (f) {
           step(5 + f * 50, 'Generating GIF… ' + Math.round(f * 100) + '%');
         });

@@ -286,7 +286,7 @@ const CANVAS = (function () {
     // out of existence by GIF dithering + MP4 VP9/H.264 compression, leaving
     // flat-looking exports.  These levels still read as "ambient smoke",
     // not "fireworks", while surviving the pipeline.
-    // Round 11: per-frame drift speeds × 1.2 — animation feels 20%
+    // Round 11: per-frame drift speeds × 1.25 — animation feels 20%
     // snappier across preview, GIF, and MP4 alike.
     for (var i = 0; i < 16; i++) {
       deepSmoke.push({
@@ -294,7 +294,7 @@ const CANVAS = (function () {
         y:   h * 0.5 + r() * h * 0.5,
         rad: 60 + r() * 80,
         op:  0.08 + r() * 0.08,       // was 0.03–0.06 → 0.08–0.16
-        spd: 7.2 + r() * 7.2
+        spd: 9.0 + r() * 9.0
       });
     }
     for (var j = 0; j < 22; j++) {
@@ -303,7 +303,7 @@ const CANVAS = (function () {
         y:     r() * h,
         rad:   25 + r() * 35,
         op:    0.06 + r() * 0.06,     // was 0.02–0.04 → 0.06–0.12
-        spd:   14.4 + r() * 12,
+        spd:   18.0 + r() * 15.0,
         phase: r() * Math.PI * 2
       });
     }
@@ -317,7 +317,7 @@ const CANVAS = (function () {
         y:   bottomBias ? (h * 0.4 + r() * h * 0.6) : r() * h,
         rad: 1.2 + r() * 1.6,
         op:  0.18 + r() * 0.22,       // was 0.05–0.15 → 0.18–0.40
-        spd: 21.6 + r() * 19.2
+        spd: 27.0 + r() * 24.0
       });
     }
     var nEmbers = Math.round(14 * areaScale); // was 8 → 14
@@ -327,7 +327,7 @@ const CANVAS = (function () {
         y:            h * 0.3 + r() * h * 0.7,
         rad:          1.2 + r() * 1.3,
         op:           0.28 + r() * 0.30,   // was 0.06–0.12 → 0.28–0.58
-        spd:          28.8 + r() * 26.4,
+        spd:          36.0 + r() * 33.0,
         flickerPhase: r() * Math.PI * 2
       });
     }
@@ -614,7 +614,9 @@ const CANVAS = (function () {
     // ── CTA button — only rendered when cta text is present ──
     if (cta && cta.trim()) {
       var ctaText  = cta.toUpperCase();               // always CAPS
-      var ctaFontSz = is916 ? 40 : 50;
+      // Round 11: CTA font sizes 30 (1:1) / 40 (9:16); button rect
+      // heights 76 / 96 — derived as font + padV*2.
+      var ctaFontSz = is916 ? 40 : 30;
       var ctaLetterSp = ctaFontSz * 0.005;            // 0.5% of font size
       ctx.save();
       ctx.font = '500 ' + ctaFontSz + 'px ' + BF;   // Montserrat Medium
@@ -622,7 +624,7 @@ const CANVAS = (function () {
       // sizes to the un-spaced text and clips the trailing chars.
       var txtW  = ctx.measureText(ctaText).width + ctaLetterSp * Math.max(0, ctaText.length - 1);
       var padH  = is916 ? 36 : 42;
-      var padV  = is916 ? 22 : 26;
+      var padV  = is916 ? 28 : 23;                    // → btnH 96 / 76
       var btnW  = Math.min(cz.w, txtW + padH * 2);
       var btnH  = Math.min(cz.h, ctaFontSz + padV * 2);
 

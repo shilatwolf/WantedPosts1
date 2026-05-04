@@ -29,8 +29,19 @@
     cta:             PLACEHOLDER_CTA,
     subLabel:        [],
     smartSuggestions:[],
-    _usingDefaults:  true,                 // flips false after any explicit user choice
     images:          {}
+  };
+
+  /* ── User-completion tracking (Round 11) ──────────────────
+     Distinct from state. Defaults populate state so the
+     preview renders immediately, but the wizard step buttons
+     only enable once the user has *explicitly* tapped a chip
+     for that step — so Step 1 is never bypassed.               */
+  var userCompleted = {
+    brand:   false,
+    image:   false,
+    message: false,
+    cta:     false
   };
 
   // Holds the generated blobs after Generate Package completes.
@@ -153,16 +164,25 @@
   }
 
   /* ── Export availability (Round 11) ───────────────────────
-     Save/export is enabled whenever the four required fields
-     are set — regardless of whether they came from explicit
-     user choices or from the on-load defaults.                 */
+     Export only requires state.cta — every other field has a
+     default in state from the moment the manifest finishes
+     parsing. Save buttons are always enabled.                   */
   function canExport() {
-    return !!(
-      state.brand &&
-      state.image &&
-      (state.messagePosition || state.messagePreset) &&
-      state.cta
-    );
+    return !!state.cta;
+  }
+
+  /* ── Continue-button gating (Round 11) ────────────────────
+     Per-step Continue buttons unlock only after the user has
+     made an EXPLICIT selection for that step. Defaults in
+     state do NOT unlock the button — the user must tap the
+     pre-selected chip (or pick a different one) at least once.
+     Step 4 is exempt: CTA has a default, button always on.      */
+  function isStepUnlocked(step) {
+    if (step === 1) return userCompleted.brand;
+    if (step === 2) return userCompleted.image;
+    if (step === 3) return userCompleted.message;
+    if (step === 4) return true;
+    return true;
   }
 
   /* ── Update step indicator ────────────────────────────── */
@@ -230,10 +250,14 @@
     }
   }
 
-  /* ── Advance to next uncompleted step ─────────────────── */
+  /* ── Advance to next not-yet-user-confirmed step ──────────
+     Round 11: defaults satisfy isComplete() for every step on
+     load, so we drive advance() off userCompleted instead — the
+     wizard surfaces whichever step the user still has to act on. */
   function advance() {
+    var keys = ['brand', 'image', 'message', 'cta'];
     for (var n = 1; n <= 4; n++) {
-      if (!isComplete(n)) {
+      if (!userCompleted[keys[n - 1]]) {
         openStep(n);
         if (elSteps[n]) {
           setTimeout(function () {
@@ -309,26 +333,64 @@
   }
 
   function onBrandSelect(key) {
-    if (state.brand === key) return;
+    var brandChanged = state.brand !== key;
+
+    // Mark Step 1 as user-confirmed (unlocks its Continue button).
+    userCompleted.brand = true;
+
+    if (!brandChanged) {
+      // User tapped the already-selected (default) brand — just
+      // confirm and let downstream gating react. No state reset.
+      syncBrandGrid();
+      renderWizard();
+      mfSyncContinueButtons();
+      mfMaybeAutoAdvance(1);
+      return;
+    }
+
     state.brand           = key;
     state.image           = null;
     state.layout          = 'left';
-    state.messagePreset   = null;
+    state.messagePreset   = PLACEHOLDER_PRESET;
+    state.messageMode     = 'preset';
     state.messagePosition = '';
     state.positionRef     = null;
     state.referralLink    = '';
-    state.cta             = null;
+    state.cta             = PLACEHOLDER_CTA;
     state.subLabel        = [];
     state.smartSuggestions = [];
+    // Brand changed → Steps 2/3 need re-confirmation. Step 4 (CTA)
+    // keeps its default-confirmed status since CTA is brand-agnostic.
+    userCompleted.image   = false;
+    userCompleted.message = false;
     CANVAS.resetSeeds();
     syncStickyPosBar();
 
     setAccent(key);
     syncBrandGrid();
     buildImageGrid();
-    clearPreset();
+
+    // Re-seed default image for the new brand so the preview keeps
+    // rendering something while the user reaches Step 2.
+    var brandDefImg = getDefaultImage(key);
+    if (brandDefImg) {
+      state.image = brandDefImg;
+      syncImageGrid();
+    }
+
+    // Re-apply preset/cta highlights (they survived the brand change).
+    if (elPresetGrid) {
+      elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.value === state.messagePreset);
+      });
+    }
     buildPositionChips();
-    clearCTA();
+    if (elCtaGrid) {
+      elCtaGrid.querySelectorAll('.cta-chip').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.value === state.cta);
+      });
+    }
+    syncCtaRequired();
     clearSubLabel();
 
     renderWizard();
@@ -420,6 +482,7 @@
   function onImageSelect(img) {
     state.image  = img;
     state.layout = 'left';
+    userCompleted.image = true;       // Round 11: explicit user pick unlocks Step 2 Continue
     CANVAS.resetSeeds();
     syncImageGrid();
     renderWizard();
@@ -475,6 +538,7 @@
     state.messagePreset   = text;
     state.messagePosition = '';
     state.positionRef     = null;
+    userCompleted.message = true;    // Round 11: unlocks Step 3 Continue
 
     if (elPresetGrid) elPresetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
       el.classList.toggle('selected', el.dataset.value === text);
@@ -514,6 +578,7 @@
 
   function onCTASelect(text) {
     state.cta = text;
+    userCompleted.cta = true;        // Round 11: explicit CTA pick recorded
     elCtaGrid.querySelectorAll('.cta-chip').forEach(function (el) {
       el.classList.toggle('selected', el.dataset.value === text);
     });
@@ -689,7 +754,7 @@
   // PNG saves are instant (live canvas → toBlob). The animated GIF + MP4
   // pipeline only runs on demand when the user opts in.
   function onExport() {
-    if (!allComplete()) return;
+    if (!canExport()) return;
     _imageDataReady.then(function () {
       showResults();
     });
@@ -711,7 +776,12 @@
     state.cta             = PLACEHOLDER_CTA;
     state.subLabel        = [];
     state.smartSuggestions = [];
-    state._usingDefaults  = true;
+    // Round 11: clear the explicit-confirmation flags so the wizard
+    // lands on Step 1 with Continue disabled, exactly like first load.
+    userCompleted.brand   = false;
+    userCompleted.image   = false;
+    userCompleted.message = false;
+    userCompleted.cta     = false;
     syncStickyPosBar();
     CANVAS.resetSeeds();
     setAccent(state.brand);
@@ -1310,6 +1380,7 @@
     state.messagePreset   = null;
     state.messagePosition = pos.title;
     state.positionRef     = pos;
+    userCompleted.message = true;    // Round 11: unlocks Step 3 Continue
 
     var presetGrid = $('preset-grid');
     if (presetGrid) presetGrid.querySelectorAll('.preset-chip').forEach(function (el) {
@@ -1444,24 +1515,28 @@
     if (back) back.disabled = mfCurrentBackBlocked();
   }
 
-  // Enable/disable each step's Continue button based on shared isComplete().
-  // Step 4's button is gated on CTA selection (Round 8 — CTA mandatory).
+  // Round 11: per-step Continue buttons gate on userCompleted, not
+  // state. Defaults populate state for preview rendering but do NOT
+  // pre-unlock buttons — user must tap a chip in each step. Step 4
+  // is exempt (CTA has a default and button stays enabled).
   function mfSyncContinueButtons() {
     if (!MF_VIEWPORT) return;
     [1,2,3,4].forEach(function (n) {
       var btn = $('mf-btn' + n);
-      if (btn) btn.disabled = !isComplete(n);
+      if (btn) btn.disabled = !isStepUnlocked(n);
     });
   }
 
   // Auto-advance after a 250ms beat so users see the chip light up before
   // sliding to the next screen. Steps 1–3 only; Step 4 stays manual.
+  // Round 11: gates on userCompleted so default-only state never
+  // auto-advances on init.
   var _mfAutoAdvanceTimer = null;
   function mfMaybeAutoAdvance(forStep) {
     if (!MF_VIEWPORT) return;
     if (mfStep !== forStep) return;
     if (forStep >= 4) return;
-    if (!isComplete(forStep)) return;
+    if (!isStepUnlocked(forStep)) return;
     clearTimeout(_mfAutoAdvanceTimer);
     _mfAutoAdvanceTimer = setTimeout(function () {
       if (mfStep === forStep) mfNext();
