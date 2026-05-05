@@ -1422,7 +1422,6 @@
     syncSubLabelUI();
 
     renderWizard();
-    advance();
     mfSyncContinueButtons();
     scheduleRender();
   }
