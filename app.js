@@ -18,7 +18,7 @@
 
   /* ── State ──────────────────────────────────────────────── */
   var state = {
-    brand:           DEFAULT_BRAND,        // pre-selected on load; user can change
+    brand:           DEFAULT_BRAND,        // 'overwolf' | 'tebex' | 'outplayed' | 'overwolfads' | 'curseforge' — pre-selected on load; user can change
     image:           null,                 // set after manifest loads (init())
     layout:          'left',               // always left — layout step removed
     messageMode:     'preset',
@@ -63,6 +63,20 @@
     'Overwolf Ads',
   ];
 
+  // Comeet `department` → BRANDS key. Anything not listed maps to 'overwolf'
+  // (mother brand). Comeet positions have no `brand` field — the department
+  // label is the only signal we get.
+  var DEPT_TO_BRAND = {
+    'Overwolf Ads': 'overwolfads',
+    'CurseForge':   'curseforge',
+    'Tebex':        'tebex'
+  };
+
+  function getBrandForPosition(pos) {
+    var dept = (pos && pos.department) || '';
+    return DEPT_TO_BRAND[dept] || 'overwolf';
+  }
+
   // ISO 3166-1 alpha-2 country codes → human-readable names used by the
   // position detail strip + extractSuggestions.
   var COUNTRY_NAMES = {
@@ -102,11 +116,11 @@
 
     if (/maternity/.test(title)) add('Maternity Leave Cover *');
 
-    if (/tebex/.test(dept)       || /tebex/.test(title))       add('Tebex');
-    if (/outplayed/.test(dept)   || /outplayed/.test(title))   add('Outplayed');
-    if (/curseforge/.test(dept)  || /curseforge/.test(title))  add('CurseForge');
-    if (/overwolf ads/.test(dept) || /overwolf ads/.test(title) ||
-        /\bads\b/.test(dept)) add('Overwolf Ads');
+    var brandKey = getBrandForPosition(pos);
+    if (brandKey === 'tebex')       add('Tebex');
+    if (brandKey === 'curseforge')  add('CurseForge');
+    if (brandKey === 'overwolfads') add('Overwolf Ads');
+    if (/outplayed/.test(dept) || /outplayed/.test(title)) add('Outplayed');
 
     if (pos.isRemote) add('Remote *');
 
@@ -1289,7 +1303,9 @@
     // unrelated positions belong to the chosen brand.
     var positions = all;
     if (state.brand && state.brand !== 'overwolf') {
-      positions = all.filter(function (p) { return p.brand === state.brand; });
+      positions = all.filter(function (p) {
+        return getBrandForPosition(p) === state.brand;
+      });
     }
 
     if (!positions.length) {
