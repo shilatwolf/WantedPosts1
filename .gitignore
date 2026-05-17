@@ -7,3 +7,9 @@ assets/data/
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Local Netlify folder
+.netlify
+
+# Claude Code local config / worktrees
+.claude/
