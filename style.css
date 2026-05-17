@@ -1,3 +1,66 @@
+/* ═══════════════════════════════════════════════════════════════
+   WANTEDPOSTS BASE RESET — DO NOT MODIFY
+   Family rules: zero radius, no shadows, no card borders,
+   Lato body, Montserrat UI, headline weight 700.
+   Tebex exception: cards use var(--card-radius) which is set
+   to 20px on .brand-tebex; 0 everywhere else.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --accent:       #D34037;
+  --accent-hover: #F05C48;
+  --accent-fg:    #FFFFFF;
+  --card-radius:  0;
+}
+/* Rule 9, 10, 11: zero radius, zero border on cards, zero shadow */
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.card, .ow-card, .brand-card, .r8-card, .results-card,
+.pos-acc-row, .sublabel-smart-box {
+  border: 0 !important;
+  border-radius: var(--card-radius) !important;
+}
+/* Rule 1, 3: bg + text colors */
+html, body {
+  background: #000000;
+  color: #FFFFFF;
+  margin: 0;
+}
+/* Rule 6: body and form input text = Lato Regular */
+html, body { font-family: 'Lato', sans-serif; font-weight: 400; }
+input, textarea, select { font-family: 'Lato', sans-serif; font-weight: 400; }
+/* Rule 7: UI chrome = Montserrat */
+h1, h2, h3, h4, h5, h6,
+nav, button, label, .label, .nav, .btn, .cta,
+.tab, .chip, .badge, .tag, .caption,
+th, .table-header, .breadcrumb, .tooltip {
+  font-family: 'Montserrat', sans-serif;
+}
+/* Rule 4: headlines Bold 700 — never 800 */
+h1, h2, h3, h4, h5, h6 { font-weight: 700; }
+/* Rule 5: headlines one solid color (defeats per-word color spans) */
+h1 *, h2 *, h3 * { color: inherit !important; }
+/* Rule 13: no arrow content on CTAs/buttons */
+.btn::after, .cta::after, button::after,
+.btn::before, .cta::before, button::before { content: none !important; }
+
+/* Phase 1.4 support: brand-swap puts an <img> inside .nav-logo.
+   Pin height explicitly (some brand SVGs have only viewBox, no
+   width/height attrs — height:auto collapses them) and cap width
+   so CurseForge's 6:1 aspect doesn't dwarf the others. */
+.nav-logo img {
+  height: 32px;
+  width: auto;
+  max-width: 130px;
+  object-fit: contain;
+  display: block;
+}
+@media (max-width: 768px) {
+  .nav-logo img { height: 26px; max-width: 104px; }
+}
+
 /* ============================================================
    OVERWOLF INTERNAL TOOL – DESIGN SYSTEM + BANNER GENERATOR
    ============================================================ */
@@ -1159,7 +1222,7 @@ footer {
   .ms-title {
     font-family:var(--font-brand);
     font-size:24px;
-    font-weight:800;
+    font-weight:700;
     color:#fff;
     line-height:1.15;
     margin-bottom:4px;
@@ -1195,7 +1258,7 @@ footer {
     border-radius:0;
     font-family:var(--font-brand);
     font-size:14px;
-    font-weight:800;
+    font-weight:700;
     letter-spacing:1.2px;
     text-transform:uppercase;
     color:var(--accent-fg);
@@ -1498,9 +1561,8 @@ footer {
   user-select: none;
   transition: color .15s;
 }
-.gen-copy-disclosure summary::-webkit-details-marker { display: none; }
-.gen-copy-disclosure summary::before { content: '▶ '; color: var(--t3); }
-.gen-copy-disclosure[open] summary::before { content: '▼ '; }
+/* Phase 2.I: native <details> triangle marker is restored (no custom
+   ::before override). Disclosure UI is exempt from rule 13. */
 .gen-copy-disclosure summary:hover { color: var(--tp); }
 .gen-copy-disclosure .preset-grid { margin-top: var(--sp-300); }
 
@@ -1623,188 +1685,11 @@ footer {
   .r8-card-story .r8-preview-story { width: 220px; }
 }
 
-/* Generate-animated card — Round 8.1: louder, with motion to draw the eye */
-.btn-generate-animated {
-  position: relative;
-  width: 100%;
-  padding: 22px 24px;
-  background:
-    linear-gradient(135deg,
-      rgba(0,0,0,0.0) 0%,
-      var(--ow-f) 50%,
-      rgba(0,0,0,0.0) 100%),
-    #0a0a0a;
-  border: 1px solid var(--accent);
-  border-radius: 0;
-  font-family: var(--font-brand);
-  color: var(--t1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  text-align: left;
-  overflow: hidden;
-  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-  box-shadow: 0 0 0 0 var(--ow-f);
-  animation: bgaBreathe 3s ease-in-out infinite;
-}
-.btn-generate-animated:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 24px -8px var(--accent);
-  animation-play-state: paused;
-}
-.btn-generate-animated:disabled {
-  cursor: default;
-  pointer-events: none;
-  opacity: 0.7;
-  animation: none;
-}
-
-/* Breathing accent glow — gentle pulse to signal "interactable / noteworthy" */
-@keyframes bgaBreathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(211,64,55,0); }
-  50%      { box-shadow: 0 0 0 4px var(--ow-f); }
-}
-
-/* Diagonal shimmer that sweeps across — the most eye-catching cue */
-.bga-shimmer {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgba(255,255,255,0.10) 50%,
-    transparent 70%
-  );
-  transform: translateX(-100%);
-  animation: bgaShimmer 3.6s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes bgaShimmer {
-  0%   { transform: translateX(-100%); }
-  60%  { transform: translateX(100%); }
-  100% { transform: translateX(100%); }
-}
-.btn-generate-animated:disabled .bga-shimmer { animation: none; opacity: 0; }
-
-/* Pulsing motion icon — communicates "animated" without text */
-.bga-icon {
-  position: relative;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.bga-icon-ring,
-.bga-icon-ring-2 {
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  opacity: 0.9;
-  animation: bgaPulseRing 2s ease-out infinite;
-}
-.bga-icon-ring-2 { animation-delay: 1s; }
-@keyframes bgaPulseRing {
-  0%   { transform: scale(0.55); opacity: 0.9; }
-  100% { transform: scale(1.4);  opacity: 0; }
-}
-.bga-icon-dot {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
-  z-index: 1;
-}
-.btn-generate-animated:disabled .bga-icon-ring,
-.btn-generate-animated:disabled .bga-icon-ring-2 { animation: none; }
-
-/* Text block */
-.bga-content {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.bga-title {
-  font-size: 14px;
-  font-weight: var(--fw-bold);
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  color: #fff;
-}
-.bga-sub {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: var(--fw-reg);
-  letter-spacing: .2px;
-  color: var(--t3);
-  text-transform: none;
-  line-height: 1.4;
-}
-
-/* Right meta — time + action arrow */
-.bga-meta {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-.bga-time {
-  font-size: 10px;
-  font-weight: var(--fw-med);
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  color: var(--t3);
-}
-.bga-arrow {
-  font-size: 12px;
-  font-weight: var(--fw-bold);
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--accent);
-  transition: transform .15s ease;
-}
-.btn-generate-animated:hover .bga-arrow { transform: translateX(2px); }
-
-/* Mobile — stack so nothing gets cramped on narrow screens */
-@media (max-width: 600px) {
-  .btn-generate-animated {
-    flex-wrap: wrap;
-    padding: 18px 16px;
-    gap: 12px;
-  }
-  .bga-content { flex-basis: calc(100% - 62px); }
-  .bga-meta {
-    flex-direction: row;
-    flex-basis: 100%;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 4px;
-    border-top: 1px solid #1e1e1e;
-    margin-top: 4px;
-  }
-}
-
-/* Generating-progress state — replaces .bga-content via JS */
-.btn-generate-animated.is-generating .bga-icon-dot {
-  animation: bgaWorking 1.2s ease-in-out infinite;
-}
-@keyframes bgaWorking {
-  0%, 100% { transform: scale(0.7); opacity: 0.6; }
-  50%      { transform: scale(1.1); opacity: 1.0; }
-}
-.btn-generate-animated.is-generating .bga-shimmer {
-  animation: bgaShimmer 1.8s linear infinite;
-  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
-}
+/* Phase 2.P: Generate-animated CTA — rebuilt as a deliberately playful
+   accent-fill button. Transform-based motion only — no gradients, shadows,
+   ring/dot decorations, or shimmer (all banned by rules 10–12, 15).
+   The actual component styling lives in the Phase 2 override block at the
+   bottom of this file (search for "PHASE 2 — COMPONENT OVERRIDES"). */
 
 /* ════════════════════════════════════════════════════════
    ROUND 8 — Mobile preview-on-top hosts + carousel
@@ -1951,7 +1836,7 @@ footer {
 .results-title {
   font-family:var(--font-brand);
   font-size:28px;
-  font-weight:800;
+  font-weight:700;
   line-height:1.2;
   color:var(--tp);
   margin-bottom:var(--sp-200);
@@ -2320,12 +2205,7 @@ footer {
   transition:color .15s;
   user-select:none;
 }
-.results-disclosure summary::-webkit-details-marker { display:none; }
-.results-disclosure summary::after {
-  content:' ▾';
-  color:var(--t3);
-}
-.results-disclosure[open] summary::after { content:' ▴'; }
+/* Phase 2.P: same as gen-copy disclosure — keep the native triangle. */
 .results-disclosure summary:hover { color:var(--tp); }
 .results-disclosure[open] summary {
   color:var(--tp);
@@ -2448,3 +2328,697 @@ footer {
   .results-zip .btn-s { width:100%; justify-content:center; }
   .results-actions .btn-p, .results-actions .btn-s { font-size:12px; padding:var(--sp-200) var(--sp-300); }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 2 — COMPONENT OVERRIDES
+   Rebuilds the visual layer to match the WantedPosts brand brief.
+   Sections A–T mirror the brief. Specificity here intentionally
+   beats the legacy rules earlier in the file; the legacy code
+   stays in place so the diff is small and reversible.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tebex card-radius applies ONLY to cards per /overwolf-brands rule:
+   "Tebex form controls/buttons stay sharp; only cards round."
+   Cards are already covered by the Phase 1.2 selector list. */
+
+/* ── A. Top nav — INTERNAL ONLY chip ───────────────────────── */
+.nav-tag {
+  background: #101010;
+  border: 0;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  height: auto;
+}
+
+/* ── B. Page header ────────────────────────────────────────── */
+.page-title {
+  color: #FFFFFF;
+  font-weight: 700; /* rule 4: never 800 */
+}
+.page-desc { color: #9F9F9F; }
+
+/* ── C. Wizard step indicator — square tiles ──────────────── */
+.si-dot {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: #101010;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  transition: background .18s ease, color .18s ease;
+}
+.si-item.active .si-dot {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+/* Done state: dark tile with accent check (icon from overwolf-icons-ui-24/check.svg, mask-tinted) */
+.si-item.done .si-dot {
+  background: #101010;
+  color: transparent;
+  position: relative;
+}
+.si-item.done .si-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6.20464L11.0327 18L5 11.335L6.50874 9.99807L10.8964 14.8456L18.3815 5L20 6.20464Z'/%3E%3C/svg%3E") no-repeat center / 18px 18px;
+          mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6.20464L11.0327 18L5 11.335L6.50874 9.99807L10.8964 14.8456L18.3815 5L20 6.20464Z'/%3E%3C/svg%3E") no-repeat center / 18px 18px;
+}
+.si-label {
+  color: #9F9F9F;
+  font-weight: 500;
+  font-size: 11px;
+}
+.si-item.active .si-label,
+.si-item.done   .si-label { color: #FFFFFF; }
+.si-line {
+  background: #3A3A3A;
+  margin-bottom: 22px;
+}
+.si-line.done { background: var(--accent); }
+
+/* ── D. Step header — square accent tile ──────────────────── */
+.step {
+  background: transparent;
+  margin-bottom: 8px;
+}
+.step-hd {
+  background: #101010;
+  padding: 14px 18px;
+  gap: 14px;
+}
+.step-num {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+}
+.step.locked .step-num {
+  background: #1a1a1a;
+  color: #6F6F6F;
+}
+.step-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #FFFFFF;
+}
+.step-selection {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  color: #9F9F9F;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.step-required {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.step-body {
+  background: #000000;
+  border-top: 0;
+  padding: 20px;
+}
+
+/* ── E. Brand grid ─────────────────────────────────────────── */
+.brand-card {
+  background: #101010;
+  border: 0;
+  padding: 24px 16px;
+  transition: background .15s ease;
+  border-radius: var(--card-radius) !important;
+}
+.brand-card:hover { background: #181818; }
+.brand-card.selected { background: #1f1f1f; }
+.brand-card-name {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+.brand-card.selected .brand-card-name { color: var(--accent); }
+
+/* ── F. Image grid ─────────────────────────────────────────── */
+.image-thumb {
+  background: #101010;
+  border: 0;
+  transition: background .15s ease, transform .15s ease;
+}
+.image-thumb:hover { background: #181818; }
+.image-thumb.selected {
+  background: #1f1f1f;
+  transform: scale(0.96);
+}
+.image-thumb-label {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+.image-thumb.selected .image-thumb-label {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+/* Empty state keeps the dashed border per designer call. */
+.empty-state {
+  border: 1px dashed #3A3A3A;
+  background: transparent;
+}
+
+/* ── G. Position accordion ─────────────────────────────────── */
+.pos-acc-row {
+  background: #101010;
+  border: 0 !important;
+  transition: background .15s ease;
+}
+.pos-acc-row:hover { background: #141414; }
+.pos-acc-row.selected { background: #1f1f1f; }
+.pos-acc-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+.pos-acc-row.selected .pos-acc-title { color: var(--accent); }
+.pos-acc-detail {
+  background: #101010;       /* flatten the rgba wash per designer call */
+  border-top: 1px solid #1e1e1e;
+}
+.pos-acc-detail-item {
+  color: #9F9F9F;
+  font-family: 'Lato', sans-serif;
+}
+.pos-acc-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #9F9F9F;
+}
+.pos-acc-detail-icon svg { display: block; }
+.pos-acc-detail-link {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 11px;
+}
+.pos-acc-detail-link:hover { text-decoration: underline; }
+.pos-acc-caret {
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M10 13L4 8.40146L5.17029 7L10 10.7016L14.8297 7L16 8.40146L10 13Z'/%3E%3C/svg%3E") no-repeat center / contain;
+          mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M10 13L4 8.40146L5.17029 7L10 10.7016L14.8297 7L16 8.40146L10 13Z'/%3E%3C/svg%3E") no-repeat center / contain;
+  font-size: 0;
+}
+
+/* ── H. Sticky position bar ────────────────────────────────── */
+.sticky-position-bar {
+  background: #101010;
+  border: 0;
+}
+.spb-title { color: #FFFFFF; }
+.spb-link {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+.spb-link:hover { text-decoration: underline; }
+
+/* ── I. General-copy disclosure — handled above by removing the
+   custom ::before markers. Restore native triangle visibility. */
+.gen-copy-disclosure summary {
+  list-style: revert;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9F9F9F;
+}
+.gen-copy-disclosure summary::-webkit-details-marker { display: revert; }
+.results-disclosure summary { list-style: revert; }
+.results-disclosure summary::-webkit-details-marker { display: revert; }
+
+/* ── J. CTA grid chips — fill on selected, no border ──────── */
+.cta-chip {
+  background: #101010;
+  border: 0;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background .15s ease;
+}
+.cta-chip:hover { background: #181818; color: #FFFFFF; }
+.cta-chip.selected {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ── K. Smart Suggestions box ──────────────────────────────── */
+.sublabel-smart-box {
+  background: #101010;
+  border: 0;
+}
+.sublabel-smart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.sublabel-smart-title .ic-lightbulb { color: var(--accent); flex-shrink: 0; }
+.sublabel-smart-hint {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  color: #9F9F9F;
+}
+
+/* ── L. Sub-label chips + "other" input ────────────────────── */
+.sublabel-heading {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: #9F9F9F;
+}
+.sublabel-chip {
+  background: #101010;
+  border: 0;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  transition: background .15s ease;
+}
+.sublabel-chip:hover { background: #181818; color: #FFFFFF; }
+.sublabel-chip.selected,
+.sublabel-chip.suggested.selected {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.sublabel-chip.suggested {
+  background: #101010;
+  color: var(--accent);
+}
+.sublabel-chip.suggested:hover {
+  background: #181818;
+  color: var(--accent);
+}
+.pos-input {
+  background: #101010;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #FFFFFF;
+  font-family: 'Lato', sans-serif;  /* rule 6: input text is Lato */
+  font-weight: 400;
+  transition: border-color .15s ease;
+}
+.pos-input:focus {
+  border-bottom-color: var(--accent);
+}
+
+/* ── N. Canvas frames ──────────────────────────────────────── */
+.canvas-wrap { padding: 0; }
+#canvas-11, #canvas-916 { border: 0; }
+.canvas-label {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: #9F9F9F;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.preview-panel {
+  background: #101010;
+  border: 0;
+}
+
+/* ── O. Export "Preview & Save" button ─────────────────────── */
+.btn-p {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.btn-p:hover { background: var(--accent-hover); }
+.btn-p:disabled {
+  background: #3A3A3A;
+  color: #6F6F6F;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.export-hint {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  color: #9F9F9F;
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── P. Results section ────────────────────────────────────── */
+.results-title { color: #FFFFFF; }
+.results-subtitle {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  color: #9F9F9F;
+}
+.results-group-label {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #9F9F9F;
+}
+.r8-card, .results-card {
+  background: #101010;
+  border: 0 !important;
+}
+.r8-preview, .results-preview {
+  border: 0;
+  background: #000000;
+}
+.r8-card-primary, .results-card-primary { border: 0; }
+.results-format-name {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+.results-format-desc {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  color: #9F9F9F;
+}
+.results-motion-badge {
+  background: #000000;
+  border: 0;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* P — Animated CTA: deliberately playful, transform-only motion. */
+.btn-generate-animated {
+  width: 100%;
+  padding: 24px 24px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform .2s ease;
+}
+.btn-generate-animated:hover { transform: scale(1.02); }
+.btn-generate-animated:active { transform: scale(1.0); }
+.btn-generate-animated:disabled {
+  background: #3A3A3A;
+  color: #6F6F6F;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-generate-animated .bga-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-fg);
+  transition: transform .25s ease;
+}
+.btn-generate-animated:hover .bga-icon { transform: rotate(-8deg) scale(1.08); }
+.btn-generate-animated .bga-icon svg { display: block; }
+.bga-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bga-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--accent-fg);
+}
+.bga-sub {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-fg);
+  opacity: 0.7;
+  line-height: 1.4;
+}
+.bga-meta {
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent-fg);
+  opacity: 0.7;
+}
+@media (max-width: 600px) {
+  .btn-generate-animated {
+    flex-wrap: wrap;
+    padding: 18px 18px;
+    gap: 12px;
+  }
+  .bga-content { flex-basis: calc(100% - 56px); }
+  .bga-meta { flex-basis: 100%; padding-top: 4px; }
+}
+
+/* P — Save buttons (icon + label) */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.btn-primary:hover { background: var(--accent-hover); opacity: 1; }
+.btn-primary.is-saved { background: var(--tok); color: #FFFFFF; }
+.btn-primary .ic-dl { color: var(--accent-fg); flex-shrink: 0; }
+
+/* P — Ghost / start-over (large secondary CTA in results section) */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid #FFFFFF;     /* Large secondary in results */
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.btn-ghost:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.btn-ghost .ic-refresh { flex-shrink: 0; }
+
+/* P — Results-zip secondary button (Large in results section) */
+.r8-zip.btn-s,
+.btn-s.r8-zip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid #FFFFFF;
+  color: #FFFFFF;
+}
+.r8-zip.btn-s:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+/* Default secondary buttons elsewhere stay Medium (#9F9F9F) */
+.btn-s:not(.r8-zip) {
+  background: transparent;
+  border: 1px solid #9F9F9F;
+  color: #FFFFFF;
+}
+.btn-s:not(.r8-zip):hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ── Q. Mobile topbar ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mf-back-btn { color: #FFFFFF; }
+  .mf-back-btn:disabled { opacity: 0.3; }
+  .mf-back-btn svg { display: block; }
+  .mf-progress { background: #3A3A3A; height: 2px; }
+  .mf-progress-fill { background: var(--accent); }
+  .mf-step-label {
+    color: #FFFFFF;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* R. Mobile step continue buttons — match desktop primary CTA.
+     Buttons stay sharp on every brand including Tebex. */
+  .ms-next {
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .ms-next:disabled {
+    background: #3A3A3A;
+    color: #6F6F6F;
+  }
+
+  /* S. Mobile results step — title 700, restart matches ghost button */
+  .ms-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .ms-sub {
+    font-family: 'Lato', sans-serif;
+    font-weight: 400;
+    color: #9F9F9F;
+  }
+  .ms-restart {
+    background: transparent;
+    border: 1px solid #FFFFFF;
+    color: #FFFFFF;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .ms-restart:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+  }
+}
+
+/* ── T. Footer ─────────────────────────────────────────────── */
+footer { border-top: 1px solid #1e1e1e; }
+.rune {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;            /* designer call: Regular, not Bold */
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  opacity: 0.55;
+}
+.ftag {
+  background: #101010;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  opacity: 1;
+}
+
+/* ── Extra: brand-card hover background uses a token so Tebex's
+   tile feels consistent across brands; reset legacy `:hover` rules
+   that referenced `var(--b2)` etc. ─────────────────────────── */
+.brand-card:hover, .brand-card.selected {
+  background: #181818;
+  border-color: transparent;
+}
+.image-thumb:hover, .image-thumb.selected {
+  background: #181818;
+  border-color: transparent;
+}
+
+/* ── Wizard step container: kill the 1px border that the legacy
+   rule set (we already strip radius via the reset; this kills
+   the visible border so the wizard reads as flat dark cards.) */
+.step {
+  border: 0 !important;
+}
+.step.locked .step-hd { background: #0a0a0a; }
+.step.locked .step-title { color: #6F6F6F; }
+.step.locked .step-body { display: none; }
+
+/* ── Layout pill (Step 3 — radio-btn / chip styling per designer
+   call: rebuild as fill-on-selected, same pattern as CTA chips) */
+.layout-pill, .radio-btn, .preset-chip {
+  background: #101010 !important;
+  border: 0 !important;
+  color: #FFFFFF;
+  transition: background .15s ease;
+}
+.layout-pill:hover, .radio-btn:hover, .preset-chip:hover {
+  background: #181818 !important;
+  color: #FFFFFF;
+}
+.layout-pill.selected, .radio-btn.selected, .preset-chip.selected {
+  background: var(--accent) !important;
+  color: var(--accent-fg) !important;
+  border: 0 !important;
+}
+.pos-chip {
+  background: #101010;
+  border: 0;
+}
+.pos-chip:hover { background: #181818; }
+.pos-chip.selected { background: #1f1f1f; }
+.pos-chip.selected .pos-chip-title { color: var(--accent); }
