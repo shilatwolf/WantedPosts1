@@ -1330,7 +1330,7 @@
     positions.forEach(function (p) {
       var row = document.createElement('div');
       row.className = 'pos-acc-row';
-      row.dataset.title = p.title;
+      row.dataset.posUrl = p.urlActivePage;
 
       var head = document.createElement('div');
       head.className = 'pos-acc-head';
@@ -1397,7 +1397,7 @@
 
     var list = $('pos-acc-list');
     if (list) list.querySelectorAll('.pos-acc-row').forEach(function (el) {
-      el.classList.toggle('selected', el.dataset.title === pos.title);
+      el.classList.toggle('selected', el.dataset.posUrl === pos.urlActivePage);
     });
 
     // Surface the extracted suggestions, but DO NOT auto-apply them.
