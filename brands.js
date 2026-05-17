@@ -17,6 +17,7 @@ const BRANDS = {
     accent:       '#D34037',
     accentHover:  '#F05C48',
     ctaTextColor: '#FFFFFF',
+    cardRadius:   '0',
     logo:         _LOGOS.overwolf,
     imagePool:    'overwolf',
     emberColor:   '#D34037'
@@ -26,6 +27,7 @@ const BRANDS = {
     accent:       '#41C4C3',
     accentHover:  '#5DE3E2',
     ctaTextColor: '#000000',
+    cardRadius:   '20px',
     logo:         _LOGOS.tebex,
     imagePool:    'tebex',
     emberColor:   null
@@ -35,6 +37,7 @@ const BRANDS = {
     accent:       '#E6004D',
     accentHover:  '#F53B6A',
     ctaTextColor: '#FFFFFF',
+    cardRadius:   '0',
     logo:         _LOGOS.outplayed,
     imagePool:    'outplayed',
     emberColor:   '#48A5FC'
@@ -44,6 +47,7 @@ const BRANDS = {
     accent:       '#D34037',
     accentHover:  '#F05C48',
     ctaTextColor: '#FFFFFF',
+    cardRadius:   '0',
     logo:         _LOGOS.overwolfads,
     imagePool:    'overwolf',
     emberColor:   '#D34037'
@@ -53,6 +57,7 @@ const BRANDS = {
     accent:       '#EB622B',
     accentHover:  '#F18536',
     ctaTextColor: '#FFFFFF',
+    cardRadius:   '0',
     logo:         _LOGOS.curseforge,
     imagePool:    'curseforge',
     emberColor:   '#EB622B'

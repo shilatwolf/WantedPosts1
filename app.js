@@ -145,11 +145,20 @@
     // Round 13: text drawn on top of --accent must respect the
     // brand's ctaTextColor (e.g. Tebex cyan needs black text).
     document.documentElement.style.setProperty('--accent-fg', b.ctaTextColor || '#FFFFFF');
+    // Phase 1.4: card-radius is 20px on Tebex, 0 everywhere else.
+    document.documentElement.style.setProperty('--card-radius', b.cardRadius || '0');
     var hex = b.accent;
     var r = parseInt(hex.slice(1, 3), 16);
     var g = parseInt(hex.slice(3, 5), 16);
     var bl = parseInt(hex.slice(5, 7), 16);
     document.documentElement.style.setProperty('--ow-f', 'rgba(' + r + ',' + g + ',' + bl + ',0.20)');
+    // Phase 1.4: swap nav logo to match the selected brand.
+    if (b.logo) {
+      var navLogo = document.querySelector('.nav-logo');
+      if (navLogo) {
+        navLogo.innerHTML = '<img src="' + b.logo + '" alt="' + (b.name || '') + '">';
+      }
+    }
   }
 
   /* ── Step completion logic ────────────────────────────── */
@@ -192,21 +201,21 @@
 
   /* ── Update step indicator ────────────────────────────── */
   function updateIndicator() {
+    var keys = ['brand', 'image', 'message', 'cta'];
     elSiItems.forEach(function (el, i) {
       var n = i + 1;
+      var done = !!userCompleted[keys[i]];
       el.classList.remove('active', 'done');
-      if (isComplete(n)) {
+      el.querySelector('.si-dot').textContent = done ? '✓' : String(n);
+      if (done) {
         el.classList.add('done');
-        el.querySelector('.si-dot').textContent = '✓';
-      } else {
-        el.querySelector('.si-dot').textContent = String(n);
-        if (!isComplete(n) && (n === 1 || isComplete(n - 1))) {
-          el.classList.add('active');
-        }
+      } else if (n === 1 || userCompleted[keys[i - 1]]) {
+        // First not-yet-confirmed step that's reachable = active.
+        el.classList.add('active');
       }
     });
     elSiLines.forEach(function (el, i) {
-      el.classList.toggle('done', isComplete(i + 1));
+      el.classList.toggle('done', !!userCompleted[keys[i]]);
     });
   }
 
@@ -399,9 +408,9 @@
     clearSubLabel();
 
     renderWizard();
-    advance();
+    // No auto-advance on brand select — let the user browse and click
+    // the next step's header (or its Continue button on mobile) when ready.
     mfSyncContinueButtons();
-    mfMaybeAutoAdvance(1);
     // Prewarm first (fetches SVG logo), then render so the logo is ready
     CANVAS.prewarmExportImages(state).then(function () { scheduleRender(); });
   }
@@ -1349,20 +1358,25 @@
     });
   }
 
+  // Inline icon SVGs (sourced from overwolf-icons-ui-24 skill — fill via currentColor)
+  var ICON_LOCATION = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 10.2C4 5.22 7.8 2 12 2C16.2 2 20 5.22 20 10.2C20 13.52 17.33 17.45 12 22C6.67 17.45 4 13.52 4 10.2ZM12 13C13.6569 13 15 11.6569 15 10C15 8.34315 13.6569 7 12 7C10.3431 7 9 8.34315 9 10C9 11.6569 10.3431 13 12 13Z"/></svg>';
+  var ICON_HOME = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2L3 9V21H9V13H15V21H21V9L12 2Z"/></svg>';
+  var ICON_GLOBE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.60009 13.5C7.56697 13.0107 7.5498 12.5098 7.5498 12C7.5498 11.4902 7.56697 10.9893 7.60009 10.5H4.1404C4.04823 10.9859 4 11.4873 4 12C4 12.5127 4.04823 13.0141 4.1404 13.5H7.60009ZM7.83313 15.5H4.80423C5.67338 17.2836 7.18613 18.6959 9.04026 19.4347C8.50695 18.3679 8.08902 17.0218 7.83313 15.5ZM9.86466 15.5H12.0524L12.0551 19.9998L12.0454 19.9999C12.0364 19.9992 12.0135 19.9956 11.9708 19.9762C11.9105 19.9488 11.8067 19.8873 11.668 19.7568C11.3797 19.4859 11.0294 19.0009 10.6917 18.2503C10.3529 17.4976 10.0661 16.565 9.86466 15.5ZM12.0551 15.5L12.0551 19.9998C12.0647 19.999 12.0875 19.995 12.1288 19.9762C12.1891 19.9488 12.2929 19.8873 12.4316 19.7568C12.7199 19.4859 13.0702 19.0009 13.4079 18.2503C13.7467 17.4976 14.0335 16.565 14.235 15.5H12.0551ZM12.0551 13.5H14.4945C14.5306 13.0159 14.5498 12.5148 14.5498 12C14.5498 11.4852 14.5306 10.9841 14.4945 10.5H12.0551L12.0551 13.5ZM16.2665 15.5C16.0147 16.9976 15.6059 18.3251 15.0847 19.3836C16.8818 18.632 18.3462 17.2434 19.1958 15.5H16.2665ZM19.8596 13.5H16.4995C16.5326 13.0107 16.5498 12.5098 16.5498 12C16.5498 11.4902 16.5326 10.9893 16.4995 10.5H19.8596C19.9518 10.9859 20 11.4873 20 12C20 12.5127 19.9518 13.0141 19.8596 13.5ZM12.0512 13.5H9.6051C9.56896 13.0159 9.5498 12.5148 9.5498 12C9.5498 11.4852 9.56896 10.9841 9.6051 10.5H12.0494L12.0512 13.5ZM9.86466 8.5H12.0481L12.0454 4.00013C12.0364 4.00076 12.0135 4.00434 11.9708 4.02377C11.9105 4.05118 11.8067 4.11273 11.668 4.24316C11.3797 4.51413 11.0294 4.99913 10.6917 5.74966C10.3529 6.50238 10.0661 7.43501 9.86466 8.5ZM14.235 8.5H12.0551L12.055 4.00019C12.0646 4.00098 12.0874 4.00492 12.1288 4.02377C12.1891 4.05118 12.2929 4.11273 12.4316 4.24316C12.7199 4.51413 13.0702 4.99913 13.4079 5.74966C13.7467 6.50238 14.0335 7.43501 14.235 8.5ZM16.2665 8.5H19.1958C18.3462 6.75664 16.8818 5.36801 15.0847 4.61635C15.6059 5.67491 16.0147 7.0024 16.2665 8.5ZM4.80423 8.5H7.83313C8.08902 6.97825 8.50695 5.63214 9.04026 4.56535C7.18613 5.30412 5.67338 6.71641 4.80423 8.5ZM12.0906 21.9996C17.5717 21.951 22 17.4926 22 12C22 6.50737 17.5717 2.04902 12.0906 2.0004C12.077 2.00013 12.0634 2 12.0498 2L12.0343 2.00006L12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22L12.0343 21.9999L12.0498 22L12.067 21.9999L12.0906 21.9996Z"/></svg>';
+
   function buildPositionDetailHtml(pos) {
     var rows = [];
     var locBits = [];
     if (pos.city) locBits.push(pos.city);
     var country = pos.country && COUNTRY_NAMES[pos.country] ? COUNTRY_NAMES[pos.country] : pos.country;
     if (country) locBits.push(country);
-    if (locBits.length) rows.push({ icon: '📍', value: locBits.join(' · ') });
+    if (locBits.length) rows.push({ icon: ICON_LOCATION, value: locBits.join(' · ') });
 
     var deptBits = [];
     if (pos.department) deptBits.push(pos.department);
     if (pos.employmentType) deptBits.push(pos.employmentType);
-    if (deptBits.length) rows.push({ icon: '🏢', value: deptBits.join('  ·  ') });
+    if (deptBits.length) rows.push({ icon: ICON_HOME, value: deptBits.join('  ·  ') });
 
-    if (pos.workplaceType) rows.push({ icon: '🌐', value: pos.workplaceType });
+    if (pos.workplaceType) rows.push({ icon: ICON_GLOBE, value: pos.workplaceType });
 
     var html = '<div class="pos-acc-detail-row">' +
       rows.map(function (r) {
@@ -1375,7 +1389,7 @@
 
     if (pos.urlActivePage) {
       html += '<a class="pos-acc-detail-link" href="' + escapeHtml(pos.urlActivePage) +
-              '" target="_blank" rel="noopener">View full job posting →</a>';
+              '" target="_blank" rel="noopener">View full job posting</a>';
     }
     return html;
   }

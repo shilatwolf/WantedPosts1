@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recruitment Banner Generator — Overwolf Internal Tools</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,12 +26,11 @@
   </a>
   <div class="nav-div"></div>
   <span class="nav-sec">Internal Tools</span>
-  <span class="nav-tag">✦ Internal only</span>
+  <span class="nav-tag">Internal only</span>
 </nav>
 
 <!-- ── Page header ───────────────────────────────────────── -->
 <div class="page-header">
-  <p class="eyebrow">Design Tools</p>
   <h1 class="page-title">Recruitment Banner Generator</h1>
   <p class="page-desc">Create on-brand recruitment banners for LinkedIn and Stories. Pick a visual, write your message, and download your sharing package.</p>
 </div>
@@ -111,7 +110,7 @@
         <!-- Sticky bar — shown when a position is selected -->
         <div class="sticky-position-bar" id="sticky-pos-bar" style="display:none">
           <div class="spb-title" id="spb-title"></div>
-          <a class="spb-link" id="spb-link" target="_blank" rel="noopener">Get referral link →</a>
+          <a class="spb-link" id="spb-link" target="_blank" rel="noopener">Get referral link</a>
         </div>
 
         <!-- General copy — collapsed by default -->
@@ -140,7 +139,10 @@
                Chips are highlighted but NOT pre-selected — Comeet data can be
                stale, so the employee verifies before tapping. -->
           <div class="sublabel-smart-box" id="sublabel-smart-box" style="display:none">
-            <p class="sublabel-smart-title">✦ Smart Suggestions</p>
+            <p class="sublabel-smart-title">
+              <svg class="ic-lightbulb" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7.49996 17.5C7.49996 17.9167 7.83329 18.3333 8.33329 18.3333H11.6666C12.1666 18.3333 12.5 17.9167 12.5 17.5V16.6667H7.49996V17.5ZM9.99996 1.66666C6.74996 1.66666 4.16663 4.24999 4.16663 7.49999C4.16663 9.49999 5.16663 11.25 6.66663 12.25V14.1667C6.66663 14.5833 6.99996 15 7.49996 15H12.5C13 15 13.3333 14.5833 13.3333 14.1667V12.25C14.8333 11.1667 15.8333 9.41666 15.8333 7.49999C15.8333 4.24999 13.25 1.66666 9.99996 1.66666Z"/></svg>
+              <span>Smart Suggestions</span>
+            </p>
             <p class="sublabel-smart-hint">Based on your Comeet listing — verify before selecting</p>
             <div class="sublabel-smart-chips" id="sublabel-smart-chips"></div>
           </div>
@@ -183,10 +185,10 @@
       <input type="hidden" id="filename-input" value="recruitment-banners">
 
       <button class="btn-p" id="btn-export" disabled>
-        Preview &amp; Save →
+        Preview &amp; Save
       </button>
 
-      <p class="export-hint" id="export-hint" style="font-size:11px;color:var(--t3);font-family:var(--font-brand);letter-spacing:.04em;line-height:1.6;text-align:center;margin:0">
+      <p class="export-hint" id="export-hint">
         PNG saves are instant. Animated versions are optional.
       </p>
 
@@ -208,10 +210,7 @@
     <div class="mf-progress"><div class="mf-progress-fill" id="mf-progress-fill"></div></div>
     <div class="mf-topbar-inner">
       <button class="mf-back-btn" id="mf-back-btn" aria-label="Back">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M9 12L13.5985 6L15 7.17029L11.2984 12L15 16.8297L13.5985 18L9 12Z"/></svg>
       </button>
       <span class="mf-step-label" id="mf-step-label">Step 1 of 4</span>
       <div class="mf-spacer"></div>
@@ -236,7 +235,7 @@
       <div class="ms-body mf-body-tight" id="mf-slot-image">
         <p class="mf-section-label">Swipe to browse visuals</p>
       </div>
-      <div class="ms-foot"><button class="ms-next" id="mf-btn2" disabled>Use this visual →</button></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn2" disabled>Use this visual</button></div>
     </div>
 
     <!-- Step 3 — Position (focused list, no preview) -->
@@ -246,7 +245,7 @@
         <p class="ms-sub">These are your current openings</p>
       </div>
       <div class="ms-body" id="mf-slot-message"></div>
-      <div class="ms-foot"><button class="ms-next" id="mf-btn3" disabled>Next →</button></div>
+      <div class="ms-foot"><button class="ms-next" id="mf-btn3" disabled>Next</button></div>
     </div>
 
     <!-- Step 4 — CTA + notes (preview + chips) -->
@@ -255,20 +254,19 @@
       <div class="ms-body mf-body-tight" id="mf-slot-action"></div>
       <div class="ms-foot">
         <p class="cta-required-note" id="mf-cta-required-note">Choose a call to action to continue</p>
-        <button class="ms-next" id="mf-btn4" disabled>Preview &amp; Save →</button>
+        <button class="ms-next" id="mf-btn4" disabled>Preview &amp; Save</button>
       </div>
     </div>
 
     <!-- Step 5 — Results (instant PNG + opt-in animated) -->
     <div class="mobile-step" id="mf-s5">
       <div class="ms-hd">
-        <p class="results-eyebrow">✦ Ready to share</p>
         <h2 class="ms-title" id="mf-result-title">Your banners</h2>
         <p class="ms-sub" id="mf-result-sub"></p>
       </div>
       <div class="ms-body" id="mf-results-body"></div>
       <div class="ms-foot" id="mf-step5-foot">
-        <button class="ms-restart" id="mf-restart-btn">↑ Start Over</button>
+        <button class="ms-restart" id="mf-restart-btn">Start Over</button>
       </div>
     </div>
 
@@ -280,7 +278,6 @@
   <div class="results-inner">
 
     <header class="results-header">
-      <p class="results-eyebrow">✦ Ready to share</p>
       <h2 class="results-title" id="results-title">Recruitment Banner</h2>
       <p class="results-subtitle" id="results-subtitle"></p>
     </header>
@@ -294,7 +291,7 @@
           <div class="r8-card-body">
             <div class="results-format-name">1:1 Static PNG</div>
             <div class="results-format-desc">Best for LinkedIn, Facebook, X</div>
-            <button class="btn-primary r8-save" id="btn-save-png11">↓ Save PNG</button>
+            <button class="btn-primary r8-save" id="btn-save-png11"><svg class="ic-dl" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.0004 3V13.9352L16.8301 11L18.0004 12.4015L12.0004 17L6.00037 12.4015L7.17065 11L11.0004 13.9352V3H13.0004Z"/><path d="M4.00037 19H20.0004V21H4.00037V19Z"/></svg><span>Save PNG</span></button>
           </div>
         </article>
       </div>
@@ -306,7 +303,7 @@
           <div class="r8-card-body">
             <div class="results-format-name">9:16 Static PNG</div>
             <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
-            <button class="btn-primary r8-save" id="btn-save-png916">↓ Save PNG</button>
+            <button class="btn-primary r8-save" id="btn-save-png916"><svg class="ic-dl" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.0004 3V13.9352L16.8301 11L18.0004 12.4015L12.0004 17L6.00037 12.4015L7.17065 11L11.0004 13.9352V3H13.0004Z"/><path d="M4.00037 19H20.0004V21H4.00037V19Z"/></svg><span>Save PNG</span></button>
           </div>
         </article>
       </div>
@@ -315,20 +312,14 @@
     <!-- ── Generate animated CTA (replaced after generation) ─── -->
     <div id="animated-section">
       <button class="btn-generate-animated" id="btn-generate-animated">
-        <span class="bga-shimmer" aria-hidden="true"></span>
         <span class="bga-icon" aria-hidden="true">
-          <span class="bga-icon-ring"></span>
-          <span class="bga-icon-ring bga-icon-ring-2"></span>
-          <span class="bga-icon-dot"></span>
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M31.1111 16.6667V6.66667H0V33.3333H31.1111V23.3333L40 32.2222V7.77778L31.1111 16.6667Z"/></svg>
         </span>
         <span class="bga-content">
-          <span class="bga-title">✦ Add motion to stand out</span>
+          <span class="bga-title">Generate Animated</span>
           <span class="bga-sub">Animated GIF + MP4 — moving posts catch more attention in feeds</span>
         </span>
-        <span class="bga-meta" aria-hidden="true">
-          <span class="bga-time">~15s</span>
-          <span class="bga-arrow">Generate →</span>
-        </span>
+        <span class="bga-meta" aria-hidden="true">~15s</span>
       </button>
     </div>
 
@@ -341,12 +332,12 @@
           <article class="results-card r8-card" data-fmt="gif11">
             <div class="r8-preview r8-preview-square">
               <img id="r8-gif-img" alt="Square animated preview">
-              <span class="results-motion-badge"><span class="results-motion-dot"></span>GIF</span>
+              <span class="results-motion-badge">GIF</span>
             </div>
             <div class="r8-card-body">
               <div class="results-format-name">1:1 Animated GIF</div>
               <div class="results-format-desc">Best for LinkedIn</div>
-              <button class="btn-primary r8-save" id="btn-save-gif">↓ Save GIF</button>
+              <button class="btn-primary r8-save" id="btn-save-gif"><svg class="ic-dl" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.0004 3V13.9352L16.8301 11L18.0004 12.4015L12.0004 17L6.00037 12.4015L7.17065 11L11.0004 13.9352V3H13.0004Z"/><path d="M4.00037 19H20.0004V21H4.00037V19Z"/></svg><span>Save GIF</span></button>
             </div>
           </article>
         </div>
@@ -355,25 +346,25 @@
           <article class="results-card r8-card r8-card-story" data-fmt="video916">
             <div class="r8-preview r8-preview-story">
               <img id="r8-mp4-img" alt="Story animated preview">
-              <span class="results-motion-badge"><span class="results-motion-dot"></span>MP4</span>
+              <span class="results-motion-badge">MP4</span>
             </div>
             <div class="r8-card-body">
               <div class="results-format-name">9:16 Animated MP4</div>
               <div class="results-format-desc">Best for Instagram Stories, TikTok, WhatsApp</div>
-              <button class="btn-primary r8-save" id="btn-save-mp4">↓ Save / Share</button>
+              <button class="btn-primary r8-save" id="btn-save-mp4"><svg class="ic-dl" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.0004 3V13.9352L16.8301 11L18.0004 12.4015L12.0004 17L6.00037 12.4015L7.17065 11L11.0004 13.9352V3H13.0004Z"/><path d="M4.00037 19H20.0004V21H4.00037V19Z"/></svg><span>Save / Share</span></button>
             </div>
           </article>
         </div>
       </div>
 
-      <button class="btn-s r8-zip" id="btn-results-zip">↓ Download all as ZIP</button>
+      <button class="btn-s r8-zip" id="btn-results-zip"><svg class="ic-dl" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.0004 3V13.9352L16.8301 11L18.0004 12.4015L12.0004 17L6.00037 12.4015L7.17065 11L11.0004 13.9352V3H13.0004Z"/><path d="M4.00037 19H20.0004V21H4.00037V19Z"/></svg><span>Download all as ZIP</span></button>
     </div>
 
     <!-- Hidden referral input (used for share caption only when relevant) -->
     <input type="hidden" id="results-referral-input" value="">
 
     <!-- ── Start over ─────────────────────────────────── -->
-    <button class="btn-ghost results-restart" id="btn-results-restart">↑ Start Over</button>
+    <button class="btn-ghost results-restart" id="btn-results-restart"><svg class="ic-refresh" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4 12C4 7.58172 7.58172 4 12 4C14.7976 4 17.2598 5.43603 18.6897 7.61118L16.5 10L22 10V4L20.0749 6.10007C18.2557 3.61435 15.3164 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C16.8379 22 20.8734 18.5645 21.8 14H19.748C18.8599 17.4505 15.7277 20 12 20C7.58172 20 4 16.4183 4 12Z"/></svg><span>Start Over</span></button>
 
   </div>
 </section>
