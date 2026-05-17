@@ -70,7 +70,7 @@ exports.handler = async () => {
           employmentType:  p.employment_type || '',
           experienceLevel: p.experience_level || '',
           sublabelHint:    titleSublabel(raw),   // from title suffix (priority)
-          brand:           deriveBrand(raw),
+          brand:           deriveBrand(raw, p.department || ''),
           // Referral bridge (§9) — link to Comeet's page where the employee
           // authenticates to get a personal ?ref= token.  Reward amount is
           // surfaced in the nudge if present.
@@ -88,16 +88,22 @@ exports.handler = async () => {
   }
 };
 
-function deriveBrand(title) {
-  // More specific patterns first — "Overwolf Ads" must match before bare
-  // "Overwolf" (which is the umbrella default).
-  // "Brand Partnerships" is the internal/alternate name for the Overwolf Ads
-  // team, so roles using that phrasing roll up under the same brand.
-  if (/overwolf\s+ads?/i.test(title))   return 'overwolfads';
-  if (/brand\s+partnerships?/i.test(title)) return 'overwolfads';
-  if (/curseforge/i.test(title))        return 'curseforge';
-  if (/tebex/i.test(title))             return 'tebex';
-  if (/outplayed/i.test(title))         return 'outplayed';
+function deriveBrand(title, department) {
+  // Title-based detection — explicit suffix convention, most specific.
+  if (/overwolf\s+ads?/i.test(title))         return 'overwolfads';
+  if (/brand\s+partnerships?/i.test(title))   return 'overwolfads';
+  if (/curseforge/i.test(title))              return 'curseforge';
+  if (/tebex/i.test(title))                   return 'tebex';
+  if (/outplayed/i.test(title))               return 'outplayed';
+  // Department fallback for positions where the title doesn't carry the brand.
+  const DEPT_TO_BRAND = {
+    'Overwolf Ads':       'overwolfads',
+    'Brand Partnerships': 'overwolfads',
+    'CurseForge':         'curseforge',
+    'Tebex':              'tebex',
+    'Outplayed':          'outplayed',
+  };
+  if (DEPT_TO_BRAND[department]) return DEPT_TO_BRAND[department];
   return 'overwolf';
 }
 

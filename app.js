@@ -63,18 +63,8 @@
     'Overwolf Ads',
   ];
 
-  // Comeet `department` → BRANDS key. Anything not listed maps to 'overwolf'
-  // (mother brand). Comeet positions have no `brand` field — the department
-  // label is the only signal we get.
-  var DEPT_TO_BRAND = {
-    'Overwolf Ads': 'overwolfads',
-    'CurseForge':   'curseforge',
-    'Tebex':        'tebex'
-  };
-
   function getBrandForPosition(pos) {
-    var dept = (pos && pos.department) || '';
-    return DEPT_TO_BRAND[dept] || 'overwolf';
+    return (pos && pos.brand) || 'overwolf';
   }
 
   // ISO 3166-1 alpha-2 country codes → human-readable names used by the
@@ -121,8 +111,6 @@
     if (brandKey === 'curseforge')  add('CurseForge');
     if (brandKey === 'overwolfads') add('Overwolf Ads');
     if (/outplayed/.test(dept) || /outplayed/.test(title)) add('Outplayed');
-
-    if (pos.isRemote) add('Remote *');
 
     return out;
   }
@@ -1342,7 +1330,7 @@
     positions.forEach(function (p) {
       var row = document.createElement('div');
       row.className = 'pos-acc-row';
-      row.dataset.title = p.title;
+      row.dataset.posUrl = p.urlActivePage;
 
       var head = document.createElement('div');
       head.className = 'pos-acc-head';
@@ -1375,7 +1363,6 @@
     if (deptBits.length) rows.push({ icon: '🏢', value: deptBits.join('  ·  ') });
 
     if (pos.workplaceType) rows.push({ icon: '🌐', value: pos.workplaceType });
-    if (pos.isRemote)      rows.push({ icon: '🌍', value: 'Open to remote' });
 
     var html = '<div class="pos-acc-detail-row">' +
       rows.map(function (r) {
@@ -1410,7 +1397,7 @@
 
     var list = $('pos-acc-list');
     if (list) list.querySelectorAll('.pos-acc-row').forEach(function (el) {
-      el.classList.toggle('selected', el.dataset.title === pos.title);
+      el.classList.toggle('selected', el.dataset.posUrl === pos.urlActivePage);
     });
 
     // Surface the extracted suggestions, but DO NOT auto-apply them.

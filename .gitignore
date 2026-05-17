@@ -10,3 +10,6 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+
+# Claude Code local config / worktrees
+.claude/
