@@ -1,0 +1,9 @@
+{
+  "name": "wantedposts",
+  "version": "1.0.0",
+  "description": "Internal tool for generating recruitment banners for the Overwolf brand family",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}

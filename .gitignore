@@ -13,3 +13,7 @@ Thumbs.db
 
 # Claude Code local config / worktrees
 .claude/
+
+# Node — dependencies installed by npm/yarn. package.json + package-lock.json
+# are tracked; everything inside node_modules/ is not.
+node_modules/
